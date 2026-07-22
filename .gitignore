@@ -1,0 +1,44 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Node / frontend (if any tooling is added later) ──────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── Models, corpus, vector DB (large; shipped via installer, never git) ──────
+models/
+backend/models/
+backend/bin/
+corpus/
+db/
+*.gguf
+
+# ── Secrets & local config ───────────────────────────────────────────────────
+.env
+.env.*
+config.json
+*.key
+secrets/
+
+# ── OS / editor ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
