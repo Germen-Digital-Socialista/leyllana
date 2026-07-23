@@ -2,8 +2,9 @@
 
 Arma el prompt (con guardrail y disclaimer), elige el proveedor segun la config,
 genera la respuesta cruda y la parsea en las cuatro secciones fijas del contrato
-de salida (ADR 0007). El parseo es puro y testeable; el proveedor local
-(llama.cpp) es un stub de Fase 1 que levanta ``NotImplementedError`` al generar.
+de salida (ADR 0007). El parseo es puro y testeable. El proveedor local corre un
+``llama-server`` local (ADR 0016); un documento que no cabe en el contexto se
+condensa antes con un map-reduce fiel (ADR 0017).
 """
 
 from __future__ import annotations

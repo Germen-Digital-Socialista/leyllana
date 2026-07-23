@@ -1,12 +1,9 @@
 """Validacion de la entrada antes de explicarla (ADR 0011).
 
 Detecta texto vacio o inutilizable y lo marca en vez de pasar texto malo al
-modelo. El OCR corre solo como fallback cuando un PDF no tiene capa de texto
-utilizable, nunca sobre un documento que ya extrae bien.
-
-En el esqueleto de Fase 1 la comprobacion de vacio/casi-vacio es real; la
-deteccion fina de PDF escaneado (densidad de texto por pagina) que dispara el
-OCR queda por implementar.
+modelo. Incluye la deteccion de PDF escaneado por densidad de texto por pagina,
+que decide cuando un PDF debe ir al OCR de respaldo (nunca sobre un documento que
+ya extrae bien).
 """
 
 from __future__ import annotations

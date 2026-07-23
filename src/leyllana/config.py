@@ -3,10 +3,9 @@
 La seleccion de proveedor y de modelo es config-driven, no hardcodeada: un modelo
 por defecto mas un fallback de baja RAM, siguiendo el patron del bloque ``models``
 de MuniGPT. Se lee de ``leyllana.toml`` con ``tomllib`` (stdlib, Python >=3.11);
-si no existe, se usan los defaults de abajo.
-
-En el esqueleto de Fase 1 nada de esto toca un modelo real: solo define la forma
-de la config para que el ``registry`` del engine tenga de donde elegir.
+si no existe, se usan los defaults de abajo. Ademas del modelo, la config lleva la
+ejecucion del ``llama-server`` (binario, GPU) y los parametros de generacion
+(ADR 0012, 0016).
 """
 
 from __future__ import annotations

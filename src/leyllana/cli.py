@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Respuesta del modelo no valida: {exc}", file=sys.stderr)
         return 3
     except NotImplementedError as exc:
-        print(f"Funcionalidad de Fase 1 aun no implementada: {exc}", file=sys.stderr)
+        print(f"Funcionalidad aun no disponible: {exc}", file=sys.stderr)
         return 4
     except ProviderError as exc:
         print(f"No se pudo generar la explicacion: {exc}", file=sys.stderr)
