@@ -20,10 +20,13 @@ def test_resolve_unknown_suffix_raises_value_error():
         resolve("archivo.docx")
 
 
-def test_resolve_pdf_not_implemented(tmp_path):
+def test_resolve_corrupt_pdf_raises_extraction_error(tmp_path):
+    # Bytes que no son un PDF valido: se marca como extraccion fallida (ADR 0011),
+    # nunca se pasa texto malo al modelo. Sin el extra `pdf` instalado el mismo
+    # error avisa que falta la dependencia; en ambos casos es ExtractionError.
     pdf = tmp_path / "x.pdf"
     pdf.write_bytes(b"%PDF-1.4")
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ExtractionError):
         resolve(str(pdf))
 
 
