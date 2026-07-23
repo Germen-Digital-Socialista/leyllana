@@ -94,7 +94,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 |------|----------------------------------------------------------------|----------|
 | 0001 | Product and scope: a plain-language Chilean law explainer       | Accepted |
 | 0002 | GUI stack: PySide6/Qt desktop                                   | Accepted |
-| 0003 | Swappable engine with a local llama.cpp default                | Accepted |
+| 0003 | Swappable engine with a local llama.cpp default                | Accepted (CPU-only part superseded by 0012) |
 | 0004 | Cloud providers via web-subscription CLIs in an embedded terminal | Accepted |
 | 0005 | Local-first and data sovereignty by default                    | Accepted |
 | 0006 | Input handling: file, paste, and URL                           | Accepted |
@@ -103,6 +103,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0009 | License: AGPL-3.0                                               | Accepted |
 | 0010 | Public repository and naming                                   | Accepted |
 | 0011 | Input validation and OCR fallback                              | Accepted |
+| 0012 | CPU baseline with optional GPU acceleration                    | Accepted (supersedes CPU-only part of 0003) |
 
 ## Further reading
 

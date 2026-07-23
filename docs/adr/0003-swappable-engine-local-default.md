@@ -1,6 +1,6 @@
 # 0003 — Swappable engine with a local llama.cpp default
 
-- **Status:** Accepted
+- **Status:** Accepted. The CPU-only constraint is superseded by [ADR 0012](0012-cpu-baseline-optional-gpu.md); the swappable-engine and local-`llama.cpp`-default decision stands.
 - **Date:** 2026-07-21
 - **Deciders:** Felipe Carvajal Brown
 
