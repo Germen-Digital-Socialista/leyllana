@@ -2,6 +2,7 @@ import pytest
 
 from leyllana.config import Config, EngineConfig
 from leyllana.engine import ParseError, explain, parse
+from leyllana.engine.base import ProviderError
 from leyllana.engine.local import LocalProvider
 from leyllana.engine.registry import get_provider
 from leyllana.types import Explanation, Nivel
@@ -23,8 +24,10 @@ def test_registry_cloud_not_implemented():
         get_provider(cfg)
 
 
-def test_explain_local_is_stub():
-    with pytest.raises(NotImplementedError):
+def test_explain_local_unconfigured_raises_provider_error():
+    # Sin server_path ni modelo configurados, el proveedor local falla ruidosamente
+    # en vez de continuar (ADR 0016).
+    with pytest.raises(ProviderError):
         explain("texto", Nivel.PUBLICO)
 
 

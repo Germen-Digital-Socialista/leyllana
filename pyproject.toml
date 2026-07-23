@@ -14,8 +14,10 @@ authors = [{ name = "Felipe Carvajal Brown" }]
 dependencies = []
 
 [project.optional-dependencies]
-# Wired at Phase 1 (see ROADMAP). Installed with e.g. `uv sync --extra engine`.
-engine = ["llama-cpp-python>=0.2"]
+# The local engine drives the external `llama-server` binary as a subprocess and
+# talks to it over loopback HTTP with the standard library (ADR 0016), so it needs
+# no Python dependency here -- only the binary + a GGUF, both config-driven. A
+# future in-process backend would reintroduce `llama-cpp-python` as its own extra.
 pdf = ["PyMuPDF>=1.24"]
 fetch = ["requests>=2.31"]
 # OCR fallback for scanned PDFs (ADR 0011): Tesseract via pytesseract, Poppler

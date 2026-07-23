@@ -15,11 +15,13 @@ def test_parser_rejects_two_sources():
         _build_parser().parse_args(["--paste", "x", "--file", "y.txt"])
 
 
-def test_cli_paste_hits_phase1_stub(capsys):
-    # El proveedor local es un stub: la corrida termina en codigo 4 con un aviso.
-    code = main(["--paste", SAMPLE])
-    assert code == 4
-    assert "Fase 1" in capsys.readouterr().err
+def test_cli_paste_unconfigured_local_reports_provider_error(capsys, tmp_path):
+    # Sin server_path ni modelo configurados, el proveedor local falla ruidosamente
+    # (codigo 5), no de forma cruda. --config apunta a un TOML inexistente para no
+    # depender de un leyllana.toml en el cwd.
+    code = main(["--paste", SAMPLE, "--config", str(tmp_path / "no-existe.toml")])
+    assert code == 5
+    assert "generar" in capsys.readouterr().err.lower()
 
 
 def test_cli_empty_paste_reports_unusable(capsys):

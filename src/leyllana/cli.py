@@ -1,9 +1,10 @@
 """CLI headless de leyllana (ROADMAP Fase 1).
 
 Resuelve una fuente (archivo/pegado/URL) a texto, la explica en el nivel elegido
-e imprime las cuatro secciones en Markdown. Sin GUI. En el esqueleto de Fase 1 el
-proveedor local es un stub, asi que una corrida completa termina avisando que la
-generacion aun no esta implementada, en vez de fallar de forma cruda.
+e imprime las cuatro secciones en Markdown. Sin GUI. La ejecucion del modelo local
+(binario y ruta al GGUF) viene de la config (``leyllana.toml`` o ``--config``); si
+no esta configurada, la corrida termina avisando de forma clara en vez de fallar de
+forma cruda.
 """
 
 from __future__ import annotations
@@ -12,7 +13,9 @@ import argparse
 import sys
 
 from . import __version__
+from .config import load
 from .engine import ParseError, explain
+from .engine.base import ProviderError
 from .input import resolve
 from .input.validation import ExtractionError
 from .types import Nivel
@@ -40,6 +43,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Nivel.PUBLICO.value,
         help="registro de audiencia (por defecto: publico)",
     )
+    parser.add_argument(
+        "--config",
+        metavar="RUTA",
+        default=None,
+        help="ruta a leyllana.toml (por defecto: ./leyllana.toml si existe)",
+    )
     return parser
 
 
@@ -55,8 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     """Punto de entrada de la CLI. Devuelve un codigo de salida (0 = ok)."""
     args = _build_parser().parse_args(argv)
     try:
+        config = load(args.config)
         text = resolve(_source_from_args(args))
-        explanation = explain(text, Nivel(args.nivel))
+        explanation = explain(text, Nivel(args.nivel), config)
     except ExtractionError as exc:
         print(f"Entrada no utilizable: {exc}", file=sys.stderr)
         return 2
@@ -66,6 +76,9 @@ def main(argv: list[str] | None = None) -> int:
     except NotImplementedError as exc:
         print(f"Funcionalidad de Fase 1 aun no implementada: {exc}", file=sys.stderr)
         return 4
+    except ProviderError as exc:
+        print(f"No se pudo generar la explicacion: {exc}", file=sys.stderr)
+        return 5
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

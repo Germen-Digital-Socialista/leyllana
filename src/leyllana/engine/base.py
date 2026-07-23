@@ -12,6 +12,15 @@ from typing import Protocol
 from ..prompt import Prompt
 
 
+class ProviderError(RuntimeError):
+    """El proveedor no pudo generar una respuesta.
+
+    Cubre configuracion incompleta (falta binario o modelo), un ``llama-server``
+    que no arranca o no responde, o una respuesta con forma inesperada. Se muestra
+    al usuario en vez de continuar con texto invalido (ADR 0016).
+    """
+
+
 class Provider(Protocol):
     """Backend que convierte un ``Prompt`` en texto de respuesta."""
 
