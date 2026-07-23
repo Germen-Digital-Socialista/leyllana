@@ -82,6 +82,21 @@ def test_is_scanned_true_when_large_majority_of_pages_lack_text(tmp_path):
     assert is_scanned_pdf(str(pdf)) is True
 
 
+def test_read_file_with_source_pdf_extracts_metadata(tmp_path):
+    from leyllana.input.files import read_file_with_source
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), _FILLER)
+    doc.set_metadata({"title": "Mi Ley PDF"})
+    pdf = tmp_path / "conmeta.pdf"
+    doc.save(str(pdf))
+    doc.close()
+    text, info = read_file_with_source(str(pdf))
+    assert "palabra" in text
+    assert info.titulo == "Mi Ley PDF"
+
+
 def test_clean_text_pdf_does_not_invoke_ocr(tmp_path, monkeypatch):
     # El OCR nunca corre sobre un PDF que ya tiene capa de texto (ADR 0011): si
     # se invocara, este test fallaria en vez de leer la capa de texto.

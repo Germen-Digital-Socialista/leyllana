@@ -26,6 +26,8 @@ import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlparse
 
+from ..types import SourceInfo
+from . import source
 from .validation import ExtractionError
 
 # API XML de leychile: texto estructurado de cualquier norma (MuniGPT, opt=7).
@@ -144,7 +146,7 @@ def _pdf_bytes_to_text(data: bytes) -> str:
         os.unlink(tmp)
 
 
-def _fetch_bcn_norma(id_norma: str) -> str:
+def _fetch_bcn_norma(id_norma: str, url: str) -> tuple[str, SourceInfo]:
     body, content_type = _http_get(_BCN_XML_URL.format(id=id_norma))
     if "html" in content_type:
         raise ExtractionError(
@@ -156,27 +158,35 @@ def _fetch_bcn_norma(id_norma: str) -> str:
         raise ExtractionError(
             f"El XML de leychile no trajo texto para idNorma={id_norma}."
         )
-    return text
+    return text, source.from_bcn_xml(body, url)
 
 
-def fetch(url: str) -> str:
-    """Descarga una fuente oficial y devuelve su texto crudo (ADR 0006).
+def fetch_with_source(url: str) -> tuple[str, SourceInfo]:
+    """Descarga una fuente y devuelve ``(texto, SourceInfo)`` (ADR 0006, FR-7.1).
 
-    Norma de BCN/leychile -> API XML; PDF -> pipeline de PDF; HTML -> texto visible;
-    texto plano -> tal cual. Los fallos se marcan como ``ExtractionError``.
+    Norma de BCN/leychile -> API XML (texto + metadatos del mismo fetch); PDF ->
+    pipeline de PDF; HTML -> texto visible; texto plano -> tal cual. Para una URL no
+    BCN la procedencia es la propia URL y la fecha de consulta. Fallos ->
+    ``ExtractionError``.
     """
     id_norma = _bcn_id_norma(url)
     if id_norma is not None:
-        return _fetch_bcn_norma(id_norma)
+        return _fetch_bcn_norma(id_norma, url)
 
     body, content_type = _http_get(url)
+    info = SourceInfo(url=url, fecha_consulta=source._today())
     if "application/pdf" in content_type or body[:5] == b"%PDF-":
-        return _pdf_bytes_to_text(body)
+        return _pdf_bytes_to_text(body), info
     if "html" in content_type:
-        return _html_to_text(body, content_type)
+        return _html_to_text(body, content_type), info
     if "xml" in content_type:
-        return _xml_to_text(body)
-    return _decode(body, content_type)
+        return _xml_to_text(body), info
+    return _decode(body, content_type), info
 
 
-__all__ = ["fetch"]
+def fetch(url: str) -> str:
+    """Descarga una fuente oficial y devuelve su texto crudo (ADR 0006)."""
+    return fetch_with_source(url)[0]
+
+
+__all__ = ["fetch", "fetch_with_source"]

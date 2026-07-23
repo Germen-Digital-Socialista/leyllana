@@ -9,7 +9,38 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..types import SourceInfo
+from . import source
 from .validation import ExtractionError
+
+
+def read_file_with_source(path: str) -> tuple[str, SourceInfo]:
+    """Lee un archivo y devuelve ``(texto, SourceInfo)`` (FR-7.1).
+
+    Un ``.pdf`` aporta sus metadatos (titulo, fecha); un ``.txt`` pelado no tiene
+    procedencia y devuelve un ``SourceInfo`` vacio. La apertura extra para leer los
+    metadatos es de un archivo local (barata), no una segunda descarga de red.
+    """
+    text = read_file(path)
+    if Path(path).suffix.lower() == ".pdf":
+        return text, source.from_pdf_metadata(_pdf_metadata(path))
+    return text, SourceInfo()
+
+
+def _pdf_metadata(path: str) -> dict:
+    """Metadatos de un PDF via PyMuPDF; ``{}`` si falta el extra o no se puede abrir."""
+    try:
+        import fitz
+    except ImportError:
+        return {}
+    try:
+        doc = fitz.open(str(path))
+    except Exception:  # noqa: BLE001 - sin metadatos si el PDF no abre
+        return {}
+    try:
+        return doc.metadata or {}
+    finally:
+        doc.close()
 
 
 def read_file(path: str) -> str:

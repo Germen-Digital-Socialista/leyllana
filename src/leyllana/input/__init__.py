@@ -13,18 +13,22 @@ importar (ADR 0005).
 
 from __future__ import annotations
 
+from ..types import SourceInfo
+
 PASTE_PREFIX = "paste:"
 
 
-def resolve(source: str) -> str:
-    """Resuelve ``source`` a texto crudo, ya validado (ADR 0006, ADR 0011).
+def resolve_with_source(source: str) -> tuple[str, SourceInfo]:
+    """Resuelve ``source`` a ``(texto, SourceInfo)``, validado (ADR 0006, 0011, FR-7.1).
 
-    - ``paste:...``            -> texto pegado (todo lo que sigue al prefijo).
-    - ``http://`` / ``https://`` -> fetch de URL oficial.
-    - cualquier otra cosa      -> ruta de archivo local (.txt / .pdf).
+    - ``paste:...``              -> texto pegado; sin procedencia (info vacia).
+    - ``http://`` / ``https://`` -> fetch de URL oficial (texto + metadatos).
+    - cualquier otra cosa        -> archivo local (.txt sin metadatos; .pdf con ellos).
 
     Antes de devolver, valida que el texto sea utilizable; si no lo es levanta
-    ``ExtractionError`` en vez de pasar texto malo al engine (ADR 0011).
+    ``ExtractionError`` en vez de pasar texto malo al engine (ADR 0011). Los
+    metadatos de la fuente se capturan en el mismo fetch/apertura: nunca se inventan
+    (ADR 0008) y un campo ausente queda en ``None``.
     """
     from .validation import validate_text
 
@@ -32,16 +36,22 @@ def resolve(source: str) -> str:
         from .paste import read_paste
 
         text = read_paste(source[len(PASTE_PREFIX) :])
+        info = SourceInfo()
     elif source.startswith(("http://", "https://")):
-        from .url import fetch
+        from .url import fetch_with_source
 
-        text = fetch(source)
+        text, info = fetch_with_source(source)
     else:
-        from .files import read_file
+        from .files import read_file_with_source
 
-        text = read_file(source)
+        text, info = read_file_with_source(source)
 
-    return validate_text(text, source=source)
+    return validate_text(text, source=source), info
 
 
-__all__ = ["resolve", "PASTE_PREFIX"]
+def resolve(source: str) -> str:
+    """Resuelve ``source`` a texto crudo, ya validado (ADR 0006, ADR 0011)."""
+    return resolve_with_source(source)[0]
+
+
+__all__ = ["resolve", "resolve_with_source", "PASTE_PREFIX"]
