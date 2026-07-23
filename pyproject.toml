@@ -19,7 +19,8 @@ dependencies = []
 # no Python dependency here -- only the binary + a GGUF, both config-driven. A
 # future in-process backend would reintroduce `llama-cpp-python` as its own extra.
 pdf = ["PyMuPDF>=1.24"]
-fetch = ["requests>=2.31"]
+# URL fetch (BCN/leychile XML, Senado/Camara HTML) uses the standard library
+# (urllib + html.parser + ElementTree), so it needs no pip dependency either.
 # OCR fallback for scanned PDFs (ADR 0011): Tesseract via pytesseract, Poppler
 # rasterization via pdf2image. Needs the Tesseract and Poppler system binaries
 # installed separately; these are only the Python bindings.

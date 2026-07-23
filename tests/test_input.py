@@ -30,9 +30,21 @@ def test_resolve_corrupt_pdf_raises_extraction_error(tmp_path):
         resolve(str(pdf))
 
 
-def test_resolve_url_not_implemented():
-    with pytest.raises(NotImplementedError):
-        resolve("https://www.bcn.cl/leychile/navegar?idNorma=1")
+def test_resolve_url_dispatches_to_fetch(monkeypatch):
+    # resolve enruta http(s) a url.fetch; se monkeypatchea la red (sin trafico real)
+    # y se valida que el texto descargado pase por el gate de validacion.
+    from leyllana.input import url as url_mod
+
+    xml = (
+        b'<Norma xmlns="http://www.leychile.cl/esquemas">'
+        b"<Texto>Articulo 1. Regula la inteligencia artificial en el Estado.</Texto>"
+        b"</Norma>"
+    )
+    monkeypatch.setattr(
+        url_mod, "_http_get", lambda u, *, timeout=None: (xml, "text/xml")
+    )
+    text = resolve("https://www.bcn.cl/leychile/navegar?idNorma=1")
+    assert "inteligencia artificial" in text
 
 
 def test_validate_text_passes_usable():
