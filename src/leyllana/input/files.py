@@ -22,8 +22,26 @@ def read_file(path: str) -> str:
     if suffix == ".txt":
         return p.read_text(encoding="utf-8")
     if suffix == ".pdf":
-        return _extract_pdf(p)
+        return _read_pdf(p)
     raise ValueError(f"Formato de archivo no soportado: {suffix!r} (use .txt o .pdf)")
+
+
+def _read_pdf(path: Path) -> str:
+    """Lee un PDF: capa de texto via PyMuPDF, con OCR de respaldo si esta escaneado.
+
+    Se extrae primero (esto ya falla ruidosamente ante un PDF corrupto o protegido,
+    ADR 0011). Si la deteccion por densidad marca el documento como escaneado, se
+    enruta al OCR completo; el OCR nunca corre sobre un PDF que ya tiene capa de
+    texto utilizable.
+    """
+    from .validation import is_scanned_pdf
+
+    text = _extract_pdf(path)
+    if is_scanned_pdf(str(path)):
+        from .ocr import ocr_pdf
+
+        return ocr_pdf(str(path))
+    return text
 
 
 def _extract_pdf(path: Path) -> str:

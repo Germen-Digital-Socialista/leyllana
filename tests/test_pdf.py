@@ -80,3 +80,16 @@ def test_is_scanned_true_when_large_majority_of_pages_lack_text(tmp_path):
     # escaneado (la gran mayoria de las paginas no tiene texto, ADR 0011).
     pdf = _make_pdf(tmp_path / "mayoria.pdf", [_FILLER, "", "", "", "", ""])
     assert is_scanned_pdf(str(pdf)) is True
+
+
+def test_clean_text_pdf_does_not_invoke_ocr(tmp_path, monkeypatch):
+    # El OCR nunca corre sobre un PDF que ya tiene capa de texto (ADR 0011): si
+    # se invocara, este test fallaria en vez de leer la capa de texto.
+    import leyllana.input.ocr as ocr_mod
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("El OCR no debe correr sobre un PDF con capa de texto")
+
+    monkeypatch.setattr(ocr_mod, "ocr_pdf", _fail)
+    pdf = _make_pdf(tmp_path / "limpio.pdf", [_FILLER, _FILLER])
+    assert "palabra" in resolve(str(pdf))
