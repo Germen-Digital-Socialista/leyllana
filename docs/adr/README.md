@@ -107,6 +107,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0013 | Explicit consent before sending content to a cloud provider    | Accepted |
 | 0014 | Traceability by verbatim citation                              | Accepted |
 | 0015 | Local model selection: Qwen3-4B default, Qwen3-1.7B fallback    | Accepted |
+| 0016 | Local llama.cpp runtime: managed llama-server subprocess        | Accepted |
 
 ## Further reading
 
