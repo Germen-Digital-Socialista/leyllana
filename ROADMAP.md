@@ -17,23 +17,31 @@ before any code.
 - Shaped by: ADR 0001, 0002, 0003, 0004, 0005, 0009, 0010.
 
 ## Phase 1 — Core engine (headless)
-**Status: Not Started**
+**Status: In Progress**
 
 The `explain(text, nivel)` pipeline working end to end with the default local
-engine, no GUI. Provable from a test harness / CLI entry point.
+engine, no GUI. Provable from a test harness / CLI entry point. Validated end to
+end on a real BCN law (fetch -> local Qwen3 -> four sections).
 
-- `input` layer: file (`.txt`/`.pdf` via PyMuPDF), paste/stdin, URL fetch
-  (BCN/Senado), plus document validation and a Tesseract OCR fallback for
-  scanned / empty / protected PDFs (FR-1.1, ADR 0011).
-- `prompt` layer: Spanish structured prompt, `nivel` switch, anti-invention
-  guardrail, verbatim-citation traceability so every named article or figure can
-  be spot-checked against the source (FR-6.1, ADR 0014), disclaimer footer.
-- `engine` layer: local `llama.cpp` provider producing the four structured
-  sections, on a CPU baseline with optional GPU acceleration when present
-  (ADR 0012).
-- Output carries source identification (title, norm type, issuing body, date,
-  URL, consultation date) when extractable, never invented (FR-7.1).
-- Shaped by: ADR 0003, 0005, 0006, 0007, 0008, 0011, 0012, 0014.
+- `input` layer **(done)**: file (`.txt`/`.pdf` via PyMuPDF), paste/stdin, URL
+  fetch (BCN/leychile XML, Senado/Camara HTML, PDF-over-URL), plus document
+  validation and a Tesseract OCR fallback for scanned / empty / protected PDFs
+  (FR-1.1, ADR 0011).
+- `prompt` layer **(done)**: Spanish structured prompt, `nivel` switch,
+  anti-invention guardrail, verbatim-citation traceability so every named article
+  or figure can be spot-checked against the source (FR-6.1, ADR 0014), disclaimer
+  footer.
+- `engine` layer **(done)**: local provider driving the `llama-server` binary as a
+  subprocess (ADR 0016), producing the four structured sections with Qwen3-4B
+  (default) / Qwen3-1.7B (low-RAM), on a CPU baseline with optional GPU (ADR 0012,
+  0015).
+- **Pending:** source identification (title, norm type, issuing body, date, URL,
+  consultation date) when extractable, never invented (FR-7.1); and long-document
+  chunking so laws that exceed the CPU-floor context window (validated: a ~15k-
+  token law overflows the 4096 floor) are processed in fragments.
+- **Deferred follow-ups (minor):** RAM-based auto-switch between the default and
+  low-RAM model, and a richer GPU auto-detect than the current `nvidia-smi` probe.
+- Shaped by: ADR 0003, 0005, 0006, 0007, 0008, 0011, 0012, 0014, 0015, 0016.
 
 ## Phase 2 — Cloud providers and terminal
 **Status: Not Started**
