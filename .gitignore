@@ -42,3 +42,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Private comprehension diagrams (Felipe only) - never pushed to this public repo
+diagrams/

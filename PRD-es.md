@@ -72,6 +72,21 @@ una suscripción.
   `.txt` leído directo, `.pdf` extraído con PyMuPDF; (b) texto pegado; (c) una URL
   de fuente oficial (endpoint de exportación de BCN / leychile.cl, boletín del
   Senado / la Cámara).
+- **RF-1.1 Validación de documentos y respaldo con OCR.** Detectar archivos
+  vacíos, protegidos o escaneados y extracciones de texto incompletas, y advertir
+  a la persona antes de generar una explicación. Cuando un `.pdf` está escaneado o
+  es solo imagen (sin capa de texto usable), recurrir a OCR: Tesseract vía
+  `pytesseract` (`-l spa`), rasterizando las páginas con pdf2image/Poppler; ningún
+  modelo de visión corre en el camino por defecto (el mismo stack y la misma
+  postura de "transcribir, no alucinar" del pipeline OCR de `chilecompracl`).
+  **El OCR se usa solo cuando es necesario** — únicamente como respaldo cuando la
+  extracción de texto falla, nunca sobre documentos que ya entregan una capa de
+  texto usable. **El OCR puede fallar o degradarse** — malas lecturas de escaneos
+  (p. ej. "artículo 12" leído como "artículo 72"), errores de transcripción o
+  binarios de sistema ausentes (Tesseract/Poppler); la herramienta marca la
+  extracción como fallida o de baja confianza en vez de pasarle texto malo al
+  modelo en silencio. Advertencia de fidelidad: la explicación es tan fiel como el
+  texto extraído. Ver ADR 0011.
 - **RF-2 Salida estructurada.** Producir secciones fijas en español: **Qué
   hace**, **A quién afecta**, **Artículos clave**, **En una frase**.
 - **RF-3 Nivel de audiencia.** Un control `nivel` con dos valores, `publico` y
@@ -82,14 +97,34 @@ una suscripción.
 - **RF-5 Nube opcional.** Proveedores opcionales: Claude, OpenAI/Codex, Gemini,
   vía clave de API o vía sus CLIs de suscripción web ejecutados en el panel de
   terminal incorporado (ver ADR 0004).
+- **RF-5.1 Consentimiento para servicios externos.** Antes de enviar cualquier
+  contenido a un proveedor en la nube, la aplicación informa con claridad que el
+  documento saldrá del equipo y solicita confirmación explícita — el enfoque local
+  y la privacidad son parte central del proyecto (ADR 0004, 0005).
 - **RF-6 Barrera anti-invención.** El prompt del motor prohíbe inventar
   artículos, números, citas u obligaciones; la salida se apoya solo en el texto
   de entrada. Si el texto no alcanza, la herramienta lo dice en vez de adivinar.
+- **RF-6.1 Trazabilidad.** Cada artículo, cifra, fecha u obligación mencionada en
+  la explicación debe usar la redacción tal como aparece en el texto de origen
+  (verbatim, garantizado por la barrera anti-invención), de modo que quien lee
+  pueda contrastar cada dato con la entrada. El enlace clicable de cada mención a
+  su fragmento de origen queda postergado (ver ROADMAP).
 - **RF-7 Descargo.** Cada explicación lleva un pie visible que indica que es una
   ayuda y no asesoría legal.
+- **RF-7.1 Identificación de la fuente.** La salida muestra, cuando estén
+  disponibles, el título del documento, el tipo de norma, el organismo de origen,
+  la fecha, la versión analizada, la URL y la fecha de consulta. Se muestran solo
+  cuando se pueden extraer y nunca se inventan (misma regla que RF-6).
 - **RF-8 Exportar.** Guardar la explicación como Markdown.
 - **RF-9 Terminal incorporada.** Un panel de terminal junto a la interfaz
   principal (pywinpty en Windows) para operar los CLIs de los proveedores.
+- **RF-10 Estado del procesamiento.** Durante la extracción y el análisis, la
+  interfaz muestra que el sistema sigue activo: una barra de progreso o indicador
+  animado, la etapa actual (**cargando**, **extrayendo texto**, **analizando**,
+  **verificando**, **generando resultado**) y el tiempo transcurrido. Cuando sea
+  técnicamente posible, muestra el porcentaje completado o el número de fragmentos
+  procesados. La persona usuaria puede cancelar la operación. (Fase GUI — ver
+  ROADMAP Fase 3.)
 
 ## 6. Requisitos no funcionales
 
@@ -98,8 +133,14 @@ una suscripción.
 - **Fidelidad antes que fluidez:** un correcto "no se puede determinar con este
   texto" vale más que una fabricación fluida.
 - **Español en todo** el UI y la salida.
-- **Solo CPU** para la inferencia local (sin suponer GPU), igual que MuniGPT.
+- **Compatible con CPU:** el funcionamiento local básico no requiere GPU (no se
+  supone GPU). Cuando exista una GPU compatible, podrá usarse opcionalmente para
+  mejorar el rendimiento. La CPU sigue siendo la línea base, igual que MuniGPT.
+  Ver ADR 0012.
 - **Base de código en un solo lenguaje** (Python) para mantenibilidad.
+- **Accesibilidad visual (fase GUI):** la interfaz admite modo claro y oscuro,
+  tipografía redimensionable y contraste adecuado para la lectura prolongada de
+  documentos legales.
 
 ## 7. Arquitectura (alto nivel)
 
@@ -118,7 +159,9 @@ una suscripción.
 ```
 
 Límites de componentes (cada uno testeable por separado):
-- **entrada** — resuelve una fuente a texto crudo. No sabe nada del motor.
+- **entrada** — resuelve una fuente a texto crudo: valida el documento y, para
+  PDFs escaneados solo cuando hace falta, le aplica OCR (ADR 0011). No sabe nada
+  del motor.
 - **motor** — `explain(text, nivel) -> resultado estructurado`. No sabe nada de
   la interfaz. El proveedor se elige por configuración.
 - **prompt** — arma el prompt en español con las barreras y el control `nivel`.
@@ -143,6 +186,9 @@ Límites de componentes (cada uno testeable por separado):
   específico de Windows; un backend basado en ptyprocess sería el camino
   Linux/macOS).
 - Objetivo de empaquetado/instalador para la v1 (postergado a la hoja de ruta).
+- Empaquetar los binarios de sistema del OCR (Tesseract + Poppler) en el
+  instalador de la v1 para una persona no técnica (Fase 4), ya que no son
+  dependencias pip.
 
 ## 10. Referencias
 

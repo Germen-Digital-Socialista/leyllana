@@ -68,6 +68,19 @@ not depend on a foreign cloud or a subscription.
 - **FR-1 Input, three ways.** Accept input as (a) a local file — `.txt` read
   directly, `.pdf` extracted via PyMuPDF; (b) pasted text; (c) a URL from an
   official source (BCN / leychile.cl export endpoint, Senado / Cámara *boletín*).
+- **FR-1.1 Document validation and OCR fallback.** Detect empty, protected, or
+  scanned files and incomplete text extraction, and warn the user before
+  producing an explanation. When a PDF is scanned / image-only (no usable text
+  layer), fall back to OCR — Tesseract via `pytesseract` (`-l spa`), rasterizing
+  pages with pdf2image/Poppler; no vision model runs on the default path (same
+  stack and no-hallucination posture as the `chilecompracl` OCR pipeline).
+  **OCR runs only when necessary** — solely as a fallback when text extraction
+  fails, never on documents that already yield a usable text layer. **OCR can
+  fail or degrade** — scanned mis-reads (e.g. "artículo 12" read as "artículo
+  72"), transcription errors, or missing system binaries (Tesseract/Poppler);
+  the tool flags a failed or low-confidence extraction rather than silently
+  feeding bad text to the model. Faithfulness caveat: the explanation is only as
+  faithful as the extracted text. See ADR 0011.
 - **FR-2 Structured output.** Produce fixed Spanish sections: **Qué hace**,
   **A quién afecta**, **Artículos clave**, **En una frase**.
 - **FR-3 Audience level.** A `nivel` control with two values, `publico` and
@@ -77,14 +90,33 @@ not depend on a foreign cloud or a subscription.
 - **FR-5 Cloud opt-in.** Optional providers: Claude, OpenAI/Codex, Gemini —
   either via API key or via their web-subscription CLIs run in the app's embedded
   terminal panel (see ADR 0004).
+- **FR-5.1 Consent for external services.** Before sending any content to a cloud
+  provider, the app clearly states that the document will leave the machine and
+  requires explicit confirmation — the local-first, sovereign posture is core to
+  the project (ADR 0004, 0005).
 - **FR-6 Anti-invention guardrail.** The engine prompt forbids inventing
   articles, numbers, citations, or obligations; output is grounded only in the
   input text. If the text is insufficient, the tool says so rather than guessing.
+- **FR-6.1 Traceability.** Every article, figure, date, or obligation named in the
+  explanation must use the wording exactly as it appears in the source (verbatim,
+  enforced by the anti-invention guardrail), so a reader can spot-check each
+  against the input. Full clickable span-linking of each mention to its source
+  fragment is deferred (see ROADMAP).
 - **FR-7 Disclaimer.** Every explanation carries a visible footer stating it is
   an aid and not legal advice.
+- **FR-7.1 Source identification.** The output shows, when available, the document
+  title, norm type, issuing body, date, version analyzed, URL, and consultation
+  date. These are shown only when extractable and are never invented (same rule as
+  FR-6).
 - **FR-8 Export.** Save the explanation as Markdown.
 - **FR-9 Embedded terminal.** A terminal panel beside the main UI (pywinpty on
   Windows) for driving provider CLIs alongside the app.
+- **FR-10 Processing status.** During extraction and analysis, the UI shows that
+  the system is still working: a progress bar or animated indicator, the current
+  stage (**cargando**, **extrayendo texto**, **analizando**, **verificando**,
+  **generando resultado**), and elapsed time. When technically possible, it shows
+  the percentage complete or the number of fragments processed. The user can
+  cancel the operation. (GUI phase — see ROADMAP Phase 3.)
 
 ## 6. Non-functional requirements
 
@@ -93,8 +125,13 @@ not depend on a foreign cloud or a subscription.
 - **Faithfulness over fluency:** a correct "I can't tell from this text" beats a
   fluent fabrication.
 - **Spanish throughout** for all UI and output.
-- **CPU-only** local inference (no GPU assumption), matching MuniGPT.
+- **CPU-compatible:** basic local operation requires no GPU (no GPU assumption).
+  When a compatible GPU is present, it may optionally be used to improve
+  performance. CPU remains the baseline, matching MuniGPT. See ADR 0012.
 - **Single-language codebase** (Python) for maintainability.
+- **Visual accessibility (GUI phase):** the interface supports light and dark
+  modes, resizable typography, and adequate contrast for prolonged reading of
+  legal documents.
 
 ## 7. Architecture (high level)
 
@@ -112,7 +149,8 @@ not depend on a foreign cloud or a subscription.
 ```
 
 Component boundaries (each independently testable):
-- **input** — resolves a source to raw text. Knows nothing about the engine.
+- **input** — resolves a source to raw text: validates the document and, for
+  scanned PDFs only when needed, OCRs it (ADR 0011). Knows nothing about the engine.
 - **engine** — `explain(text, nivel) -> structured result`. Knows nothing about
   the GUI. Provider selected by config.
 - **prompt** — builds the Spanish system+user prompt with guardrails and the
@@ -134,6 +172,8 @@ Component boundaries (each independently testable):
 - Terminal integration details on non-Windows platforms (pywinpty is
   Windows-specific; a ptyprocess-based backend would be the Linux/macOS path).
 - Packaging/installer target for v1 (deferred to the roadmap).
+- Bundling the OCR system binaries (Tesseract + Poppler) into the v1 installer
+  for a non-technical user (Phase 4), since they are not pip dependencies.
 
 ## 10. References
 
