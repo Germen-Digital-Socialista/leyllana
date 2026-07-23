@@ -138,8 +138,13 @@ class LlamaServer:
             ]
             if self._threads > 0:
                 args += ["-t", str(self._threads)]
+            # cwd = carpeta del binario: llama.cpp carga sus backends ggml-*.dll
+            # (por CPU) relativos al ejecutable/cwd; asi se encuentran siempre.
             self._proc = subprocess.Popen(
-                args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                args,
+                cwd=str(self._binary.parent),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             self._wait_healthy()
             return self._base
