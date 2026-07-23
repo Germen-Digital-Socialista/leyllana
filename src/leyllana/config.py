@@ -29,11 +29,22 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class EngineConfig:
-    """Seleccion de proveedor y modelos (default + fallback de baja RAM)."""
+    """Seleccion de proveedor, modelos y ejecucion del llama-server (ADR 0016).
+
+    ``server_path`` apunta al binario ``llama-server`` (externo, no es dependencia
+    pip). ``gpu`` sigue ADR 0012: ``auto`` intenta GPU y cae a CPU, ``cpu`` fuerza
+    CPU, ``gpu`` fuerza la descarga a GPU. La generacion es config-driven y
+    conservadora: temperatura baja para no inventar (ADR 0008).
+    """
 
     provider: str = "local"
     default_model: ModelConfig = field(default_factory=ModelConfig)
     fallback_model: ModelConfig = field(default_factory=lambda: ModelConfig(ctx=2048))
+    server_path: str | None = None
+    gpu: str = "auto"
+    temperature: float = 0.2
+    max_tokens: int = 1024
+    threads: int = 0
 
 
 @dataclass(frozen=True)
@@ -65,5 +76,10 @@ def load(path: str | Path | None = None) -> Config:
         provider=engine_data.get("provider", "local"),
         default_model=_model_from_dict(models_data.get("default", {})),
         fallback_model=_model_from_dict(models_data.get("fallback", {"ctx": 2048})),
+        server_path=engine_data.get("server_path"),
+        gpu=engine_data.get("gpu", "auto"),
+        temperature=float(engine_data.get("temperature", 0.2)),
+        max_tokens=int(engine_data.get("max_tokens", 1024)),
+        threads=int(engine_data.get("threads", 0)),
     )
     return replace(Config(), engine=engine)
