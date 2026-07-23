@@ -63,17 +63,28 @@ class SourceInfo:
     url: str | None = None
     fecha_consulta: str | None = None
 
+    def _campos(self) -> tuple[tuple[str, str | None], ...]:
+        return (
+            ("Titulo", self.titulo),
+            ("Tipo de norma", self.tipo_norma),
+            ("Organo emisor", self.organo_emisor),
+            ("Fecha", self.fecha),
+            ("Version", self.version),
+            ("URL", self.url),
+            ("Fecha de consulta", self.fecha_consulta),
+        )
+
     def is_empty(self) -> bool:
         """True si no se identifico ningun dato de la fuente."""
-        return all(
-            valor is None
-            for valor in (
-                self.titulo,
-                self.tipo_norma,
-                self.organo_emisor,
-                self.fecha,
-                self.version,
-                self.url,
-                self.fecha_consulta,
-            )
-        )
+        return all(valor is None for _, valor in self._campos())
+
+    def to_markdown(self) -> str:
+        """Renderiza el bloque de Fuente con los campos identificados (FR-7.1).
+
+        Solo muestra los campos no vacios; un campo en ``None`` (no determinado)
+        no aparece, nunca se inventa. Devuelve ``""`` si no hay nada que mostrar.
+        """
+        lineas = [f"- **{etq}:** {val}" for etq, val in self._campos() if val]
+        if not lineas:
+            return ""
+        return "## Fuente\n\n" + "\n".join(lineas) + "\n"

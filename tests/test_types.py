@@ -27,3 +27,19 @@ def test_sourceinfo_empty_by_default():
 
 def test_sourceinfo_not_empty_with_any_field():
     assert SourceInfo(titulo="Ley 21.000").is_empty() is False
+
+
+def test_sourceinfo_to_markdown_empty_is_blank():
+    assert SourceInfo().to_markdown() == ""
+
+
+def test_sourceinfo_to_markdown_renders_known_fields_only():
+    info = SourceInfo(
+        titulo="ESTABLECE BASES", tipo_norma="Ley 19880", url="https://x"
+    )
+    md = info.to_markdown()
+    assert md.startswith("## Fuente")
+    assert "ESTABLECE BASES" in md
+    assert "Ley 19880" in md
+    assert "https://x" in md
+    assert "emisor" not in md.lower()  # un campo None no aparece
