@@ -73,4 +73,24 @@ def build(text: str, nivel: Nivel) -> Prompt:
     return Prompt(system=system, user=user)
 
 
-__all__ = ["Prompt", "build", "GUARDRAIL"]
+def build_extract(chunk: str) -> Prompt:
+    """Prompt para extraer puntos clave fieles de un FRAGMENTO (map de ADR 0017).
+
+    No pide las cuatro secciones: pide vinetas fieles con la cita del articulo tal
+    como aparece, para que la sintesis posterior trabaje sobre hechos anclados al
+    texto y no sobre invenciones (ADR 0008, 0014).
+    """
+    system = (
+        "Eres leyllana. Extrae los puntos clave de un FRAGMENTO de un texto legal "
+        "chileno, de forma fiel y en espanol de Chile.\n\n"
+        f"{GUARDRAIL}\n\n"
+        "Devuelve solo una lista de vinetas concisas. En cada punto que corresponda "
+        "a un articulo, cita su numero tal como aparece (por ejemplo 'Articulo 5'). "
+        "No agregues nada que no este en el fragmento ni intentes resumir la norma "
+        "completa: es solo un fragmento."
+    )
+    user = f"Fragmento del texto legal:\n\n{chunk}"
+    return Prompt(system=system, user=user)
+
+
+__all__ = ["Prompt", "build", "build_extract", "GUARDRAIL"]

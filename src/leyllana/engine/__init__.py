@@ -11,9 +11,16 @@ from __future__ import annotations
 import unicodedata
 
 from ..config import Config
-from ..prompt import build
+from ..prompt import build, build_extract
 from ..types import Explanation, Nivel
+from .base import Provider
+from .chunking import chars_for_tokens, estimate_tokens, split_structural
 from .registry import get_provider
+
+# Reserva de tokens para el system prompt y sus instrucciones (fuera del texto).
+_SYSTEM_RESERVE_TOKENS = 600
+# Tope de niveles de reduccion jerarquica antes de conformarse (ADR 0017).
+_MAX_REDUCE_DEPTH = 3
 
 
 class ParseError(RuntimeError):
@@ -32,14 +39,50 @@ _SECTION_FIELDS = (
 def explain(text: str, nivel: Nivel, config: Config | None = None) -> Explanation:
     """Explica ``text`` en el ``nivel`` dado y devuelve una ``Explanation``.
 
-    Orquesta prompt -> proveedor -> parseo. El proveedor por defecto (local
-    llama.cpp) es un stub de Fase 1 y levanta ``NotImplementedError`` al generar.
+    Orquesta prompt -> proveedor -> parseo. Si el texto no cabe en el contexto del
+    modelo, primero se condensa con un map-reduce fiel (ADR 0017): se extraen puntos
+    clave por fragmento y la sintesis final trabaja sobre esos puntos.
     """
     cfg = config if config is not None else Config()
-    prompt = build(text, nivel)
     provider = get_provider(cfg)
-    raw = provider.generate(prompt)
+    condensed = _condense(text, provider, cfg)
+    raw = provider.generate(build(condensed, nivel))
     return parse(raw)
+
+
+def _budget_tokens(config: Config) -> int:
+    """Tokens de texto que caben dejando espacio al system prompt y a la salida."""
+    engine = config.engine
+    return engine.default_model.ctx - engine.max_tokens - _SYSTEM_RESERVE_TOKENS
+
+
+def _condense(
+    text: str, provider: Provider, config: Config, _depth: int = 0
+) -> str:
+    """Devuelve texto que cabe en el contexto: el original, o puntos clave (ADR 0017).
+
+    Si ``text`` cabe, se devuelve tal cual (pasada unica). Si no, se parte en
+    fragmentos por estructura, se extraen puntos clave fieles de cada uno (map) y se
+    juntan; si el conjunto aun no cabe, se reduce jerarquicamente hasta un tope.
+    """
+    budget = _budget_tokens(config)
+    if estimate_tokens(text) <= budget or budget <= 0:
+        return text
+
+    max_chars = chars_for_tokens(budget)
+    points = [
+        provider.generate(build_extract(chunk)).strip()
+        for chunk in split_structural(text, max_chars=max_chars)
+    ]
+    pooled = "\n".join(p for p in points if p)
+
+    if (
+        estimate_tokens(pooled) > budget
+        and _depth < _MAX_REDUCE_DEPTH
+        and len(pooled) < len(text)
+    ):
+        return _condense(pooled, provider, config, _depth + 1)
+    return pooled
 
 
 def _norm(line: str) -> str:

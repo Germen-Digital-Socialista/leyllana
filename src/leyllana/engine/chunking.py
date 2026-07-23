@@ -29,6 +29,11 @@ def estimate_tokens(text: str) -> int:
     return int(len(text) / _CHARS_PER_TOKEN)
 
 
+def chars_for_tokens(tokens: int) -> int:
+    """Caracteres aproximados que caben en ``tokens`` (inverso de la estimacion)."""
+    return int(tokens * _CHARS_PER_TOKEN)
+
+
 def _split_by_size(text: str, max_chars: int, overlap: int) -> list[str]:
     """Corta ``text`` en ventanas de ``max_chars`` con ``overlap`` de solape."""
     if len(text) <= max_chars:
@@ -78,4 +83,4 @@ def split_structural(
     return chunks
 
 
-__all__ = ["estimate_tokens", "split_structural"]
+__all__ = ["estimate_tokens", "chars_for_tokens", "split_structural"]
