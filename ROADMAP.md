@@ -22,12 +22,18 @@ before any code.
 The `explain(text, nivel)` pipeline working end to end with the default local
 engine, no GUI. Provable from a test harness / CLI entry point.
 
-- `input` layer: file (`.txt`/`.pdf`), paste/stdin, URL fetch (BCN/Senado).
+- `input` layer: file (`.txt`/`.pdf` via PyMuPDF), paste/stdin, URL fetch
+  (BCN/Senado), plus document validation and a Tesseract OCR fallback for
+  scanned / empty / protected PDFs (FR-1.1, ADR 0011).
 - `prompt` layer: Spanish structured prompt, `nivel` switch, anti-invention
-  guardrail, disclaimer footer.
+  guardrail, verbatim-citation traceability so every named article or figure can
+  be spot-checked against the source (FR-6.1, ADR 0014), disclaimer footer.
 - `engine` layer: local `llama.cpp` provider producing the four structured
-  sections.
-- Shaped by: ADR 0003, 0005, 0006, 0007, 0008.
+  sections, on a CPU baseline with optional GPU acceleration when present
+  (ADR 0012).
+- Output carries source identification (title, norm type, issuing body, date,
+  URL, consultation date) when extractable, never invented (FR-7.1).
+- Shaped by: ADR 0003, 0005, 0006, 0007, 0008, 0011, 0012, 0014.
 
 ## Phase 2 — Cloud providers and terminal
 **Status: Not Started**
@@ -35,9 +41,11 @@ engine, no GUI. Provable from a test harness / CLI entry point.
 Make the engine swappable and add the side terminal.
 
 - Provider abstraction: Claude / OpenAI-Codex / Gemini via API key.
+- Explicit consent gate before any content leaves the machine for a cloud
+  provider (FR-5.1, ADR 0013).
 - Web-subscription path: driving provider CLIs from the embedded terminal.
 - `pywinpty` terminal panel (Windows first).
-- Shaped by: ADR 0003, 0004.
+- Shaped by: ADR 0003, 0004, 0013.
 
 ## Phase 3 — GUI
 **Status: Not Started**
@@ -45,6 +53,11 @@ Make the engine swappable and add the side terminal.
 The PySide6 desktop app: source panel, result panel, embedded terminal, export.
 
 - Load source, pick `nivel`, run, render the four sections, export to Markdown.
+- Processing status while working: progress / stage indicator, elapsed time,
+  percentage or fragment count when possible, and a cancel control (FR-10).
+- Visual accessibility: light / dark themes, resizable type, adequate contrast.
+- Show the source identification block in the result panel when available
+  (FR-7.1, display side).
 - Settings: engine/provider selection, API keys (stored locally only).
 - Shaped by: ADR 0002, 0004, 0007.
 
@@ -66,3 +79,7 @@ Ship something a non-technical user can install and run, then test it on real
 - Q&A over a law with cited articles.
 - Legislative tracking / scanning for new AI-related *boletines*.
 - Cross-platform terminal backend (Linux/macOS) beyond `pywinpty`.
+- RapidOCR cross-checking of the Tesseract output, and any vision-LLM OCR
+  opt-in, beyond the Tesseract-only v1 path (ADR 0011).
+- Full clickable span-linking of each cited mention to its exact source
+  fragment, beyond the verbatim-citation traceability of v1 (ADR 0014).
