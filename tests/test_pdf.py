@@ -10,7 +10,9 @@ fitz = pytest.importorskip("fitz")
 
 from leyllana.input import resolve  # noqa: E402
 from leyllana.input.files import _extract_pdf  # noqa: E402
-from leyllana.input.validation import ExtractionError  # noqa: E402
+from leyllana.input.validation import ExtractionError, is_scanned_pdf  # noqa: E402
+
+_FILLER = "palabra " * 20  # texto suficiente para que una pagina cuente como texto
 
 
 def _make_pdf(path, pages):
@@ -61,3 +63,20 @@ def test_extract_corrupt_pdf_raises_extraction_error(tmp_path):
     pdf.write_bytes(b"%PDF-1.4 esto no es un PDF valido")
     with pytest.raises(ExtractionError):
         _extract_pdf(pdf)
+
+
+def test_is_scanned_false_for_text_pdf(tmp_path):
+    pdf = _make_pdf(tmp_path / "texto.pdf", [_FILLER, _FILLER])
+    assert is_scanned_pdf(str(pdf)) is False
+
+
+def test_is_scanned_true_for_pages_without_text_layer(tmp_path):
+    pdf = _make_pdf(tmp_path / "sinTexto.pdf", ["", ""])
+    assert is_scanned_pdf(str(pdf)) is True
+
+
+def test_is_scanned_true_when_large_majority_of_pages_lack_text(tmp_path):
+    # Una sola pagina con texto entre muchas sin capa de texto: se trata como
+    # escaneado (la gran mayoria de las paginas no tiene texto, ADR 0011).
+    pdf = _make_pdf(tmp_path / "mayoria.pdf", [_FILLER, "", "", "", "", ""])
+    assert is_scanned_pdf(str(pdf)) is True

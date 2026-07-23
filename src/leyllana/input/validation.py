@@ -24,6 +24,12 @@ class ExtractionError(RuntimeError):
 # Minimo de caracteres no-espacio para considerar la extraccion utilizable.
 _MIN_USABLE_CHARS = 20
 
+# Umbrales para la deteccion de PDF escaneado por densidad de texto (ADR 0011).
+# Una pagina "tiene capa de texto" si supera este minimo de caracteres no-espacio;
+# el PDF se considera escaneado si menos de este ratio de paginas la tiene.
+_MIN_CHARS_PER_PAGE = 50
+_MIN_TEXT_PAGE_RATIO = 0.2
+
 
 def validate_text(text: str, *, source: str | None = None) -> str:
     """Valida el texto extraido y lo devuelve si es utilizable.
@@ -43,11 +49,32 @@ def validate_text(text: str, *, source: str | None = None) -> str:
 def is_scanned_pdf(path: str) -> bool:
     """Decide si un PDF carece de capa de texto utilizable y debe ir a OCR.
 
-    Deteccion por densidad de texto por pagina (ADR 0011). Fase 1: por implementar.
+    Deteccion por densidad de texto por pagina (ADR 0011): se cuenta cuantas
+    paginas superan ``_MIN_CHARS_PER_PAGE`` caracteres no-espacio. Si menos de
+    ``_MIN_TEXT_PAGE_RATIO`` de las paginas tiene capa de texto, el documento se
+    trata como escaneado y se enruta al OCR completo. Un documento vacio no es
+    "escaneado" (no hay imagen que leer): lo marca ``validate_text``.
     """
-    raise NotImplementedError(
-        "Deteccion de PDF escaneado por densidad de texto: se implementa en Fase 1."
-    )
+    import fitz  # PyMuPDF, importado de forma perezosa (extra `pdf`).
+
+    try:
+        doc = fitz.open(str(path))
+    except Exception as exc:  # PDF ilegible/corrupto: no alimentar texto malo.
+        raise ExtractionError(f"No se pudo abrir el PDF: {path}") from exc
+
+    try:
+        total = doc.page_count
+        if total == 0:
+            return False
+        text_pages = sum(
+            1
+            for page in doc
+            if len("".join(page.get_text().split())) >= _MIN_CHARS_PER_PAGE
+        )
+    finally:
+        doc.close()
+
+    return (text_pages / total) < _MIN_TEXT_PAGE_RATIO
 
 
 __all__ = ["ExtractionError", "validate_text", "is_scanned_pdf"]
