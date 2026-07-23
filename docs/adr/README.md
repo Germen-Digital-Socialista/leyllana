@@ -102,6 +102,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0008 | Anti-invention and not-legal-advice guardrails                 | Accepted |
 | 0009 | License: AGPL-3.0                                               | Accepted |
 | 0010 | Public repository and naming                                   | Accepted |
+| 0011 | Input validation and OCR fallback                              | Accepted |
 
 ## Further reading
 
