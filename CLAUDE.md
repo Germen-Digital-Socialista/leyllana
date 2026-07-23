@@ -51,9 +51,14 @@ These apply to all work here, exactly as they do across Felipe's repos:
   Felipe's repos. ROADMAP is phase-based (Not Started / In Progress / Blocked /
   Done), not calendar-dated. ADRs are MADR-lite, numbered `000N-title.md`, and
   immutable once Accepted (supersede with a new ADR rather than editing).
-- **Commit/push only when asked.** Solo repo: when told to commit, work directly
-  on `main` unless asked otherwise. Never open a pull request unless explicitly
-  asked in that turn.
+- **Commit as you go, in logical Conventional Commits.** Don't batch a whole
+  session into one commit: split work into small, self-contained commits at each
+  logical boundary and commit as you reach it. Messages follow the
+  [Conventional Commits](https://www.conventionalcommits.org) spec —
+  `type(scope): summary`, types like `feat`, `fix`, `docs`, `chore`, `test`,
+  `refactor`, `build`. Push only when explicitly asked; committing does not imply
+  pushing. Solo repo: work directly on `main` unless asked otherwise. Never open
+  a pull request unless explicitly asked in that turn.
 
 ## Working conventions
 
