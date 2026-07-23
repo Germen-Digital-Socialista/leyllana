@@ -37,6 +37,16 @@ _NIVEL_INSTRUCTIONS: dict[Nivel, str] = {
     ),
 }
 
+# Cita verbatim acotada (ADR 0014): los identificadores (numero de articulo,
+# fecha, monto, cifra) se copian tal como aparecen; el contenido se explica en
+# lenguaje llano. Complementa el guardrail y hace cada mencion verificable por
+# coincidencia de texto contra la fuente.
+CITATION = (
+    "Cuando nombres un articulo, una fecha, un monto o una cifra, escribe el numero "
+    "o identificador tal como aparece en el texto (no lo renumeres ni redondees); "
+    "explica su contenido en lenguaje llano."
+)
+
 # Las cuatro secciones fijas que debe devolver el modelo (ADR 0007).
 _SECTIONS = (
     "Que hace: que hace la norma.",
@@ -64,6 +74,7 @@ def build(text: str, nivel: Nivel) -> Prompt:
         "Eres leyllana, un asistente que explica leyes y boletines chilenos en "
         "lenguaje llano (espanol de Chile).\n\n"
         f"{GUARDRAIL}\n\n"
+        f"{CITATION}\n\n"
         f"{_NIVEL_INSTRUCTIONS[nivel]}\n\n"
         "Responde SIEMPRE con estas cuatro secciones, en este orden y con estos "
         f"titulos:\n{secciones}\n\n"
@@ -93,4 +104,4 @@ def build_extract(chunk: str) -> Prompt:
     return Prompt(system=system, user=user)
 
 
-__all__ = ["Prompt", "build", "build_extract", "GUARDRAIL"]
+__all__ = ["Prompt", "build", "build_extract", "GUARDRAIL", "CITATION"]

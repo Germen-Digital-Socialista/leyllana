@@ -17,3 +17,9 @@ def test_build_is_pure():
 
 def test_nivel_changes_register():
     assert build("t", Nivel.PUBLICO).system != build("t", Nivel.TECNICO).system
+
+
+def test_build_includes_scoped_verbatim_citation_clause():
+    # ADR 0014: los identificadores citados van tal como aparecen en el texto.
+    p = build("Articulo 5. Algo.", Nivel.PUBLICO)
+    assert "tal como aparece" in p.system.lower()
