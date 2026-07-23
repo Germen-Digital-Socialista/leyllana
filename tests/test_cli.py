@@ -28,3 +28,37 @@ def test_cli_empty_paste_reports_unusable(capsys):
     code = main(["--paste", "   "])
     assert code == 2
     assert "utilizable" in capsys.readouterr().err.lower()
+
+
+def test_cli_renders_fuente_block_above_sections(monkeypatch, capsys, tmp_path):
+    from leyllana import cli
+    from leyllana.types import Explanation, SourceInfo
+
+    info = SourceInfo(titulo="ESTABLECE BASES", tipo_norma="Ley 19880")
+    monkeypatch.setattr(cli, "resolve_with_source", lambda s: ("texto", info))
+    monkeypatch.setattr(
+        cli, "explain", lambda text, nivel, config: Explanation("q", "a", "art", "f")
+    )
+    code = cli.main(["--paste", "x", "--config", str(tmp_path / "none.toml")])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "## Fuente" in out
+    assert "ESTABLECE BASES" in out
+    assert out.index("## Fuente") < out.index("## Que hace")  # bloque arriba
+
+
+def test_cli_no_fuente_block_for_paste(monkeypatch, capsys, tmp_path):
+    from leyllana import cli
+    from leyllana.types import Explanation
+
+    monkeypatch.setattr(
+        cli, "explain", lambda text, nivel, config: Explanation("q", "a", "art", "f")
+    )
+    code = cli.main(
+        ["--paste", "Articulo 1. Texto suficiente para validar.",
+         "--config", str(tmp_path / "none.toml")]
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "## Fuente" not in out  # texto pegado: sin bloque de fuente
+    assert "## Que hace" in out

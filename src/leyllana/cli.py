@@ -16,7 +16,7 @@ from . import __version__
 from .config import load
 from .engine import ParseError, explain
 from .engine.base import ProviderError
-from .input import resolve
+from .input import resolve_with_source
 from .input.validation import ExtractionError
 from .types import Nivel
 
@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         config = load(args.config)
-        text = resolve(_source_from_args(args))
+        text, info = resolve_with_source(_source_from_args(args))
         explanation = explain(text, Nivel(args.nivel), config)
     except ExtractionError as exc:
         print(f"Entrada no utilizable: {exc}", file=sys.stderr)
@@ -96,7 +96,10 @@ def main(argv: list[str] | None = None) -> int:
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-    print(explanation.to_markdown())
+    salida = explanation.to_markdown()
+    if not info.is_empty():
+        salida = info.to_markdown() + "\n" + salida
+    print(salida)
     return 0
 
 
