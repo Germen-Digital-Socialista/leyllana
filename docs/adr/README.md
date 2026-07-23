@@ -105,6 +105,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0011 | Input validation and OCR fallback                              | Accepted |
 | 0012 | CPU baseline with optional GPU acceleration                    | Accepted (supersedes CPU-only part of 0003) |
 | 0013 | Explicit consent before sending content to a cloud provider    | Accepted |
+| 0014 | Traceability by verbatim citation                              | Accepted |
 
 ## Further reading
 
