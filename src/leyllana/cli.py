@@ -52,6 +52,19 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _force_utf8_output() -> None:
+    """Fuerza UTF-8 en stdout/stderr para que los acentos del espanol no se rompan.
+
+    En consolas Windows con code page heredada (cp1252) el texto en UTF-8 se ve
+    mal; reconfigurar la salida a UTF-8 lo corrige. Es best-effort: si el stream no
+    soporta ``reconfigure``, se deja como esta.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def _source_from_args(args: argparse.Namespace) -> str:
     if args.file is not None:
         return args.file
@@ -62,6 +75,7 @@ def _source_from_args(args: argparse.Namespace) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     """Punto de entrada de la CLI. Devuelve un codigo de salida (0 = ok)."""
+    _force_utf8_output()
     args = _build_parser().parse_args(argv)
     try:
         config = load(args.config)
