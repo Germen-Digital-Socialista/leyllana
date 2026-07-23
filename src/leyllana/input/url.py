@@ -10,7 +10,11 @@ from __future__ import annotations
 
 
 def fetch(url: str) -> str:
-    """Descarga una fuente oficial y devuelve su texto crudo. (Fase 1: por implementar.)"""
+    """Descarga una fuente oficial y devuelve su texto crudo.
+
+    (Fase 1: por implementar.)
+    """
     raise NotImplementedError(
-        "Fetch de URL (BCN/Senado/Camara) con sniffing de content-type: se implementa en Fase 1."
+        "Fetch de URL (BCN/Senado/Camara) con sniffing de content-type: "
+        "se implementa en Fase 1."
     )

@@ -7,7 +7,7 @@ Las secciones fijas provienen del contrato de salida (ADR 0007).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 # Disclaimer visible en cada explicacion (PRD FR-7, ADR 0008). No es asesoria
 # legal; es una ayuda de lectura.
@@ -18,7 +18,7 @@ DISCLAIMER = (
 )
 
 
-class Nivel(str, Enum):
+class Nivel(StrEnum):
     """Registro de audiencia. Cambia tono y profundidad, nunca los hechos (ADR 0007)."""
 
     PUBLICO = "publico"
@@ -27,7 +27,7 @@ class Nivel(str, Enum):
 
 @dataclass(frozen=True)
 class Explanation:
-    """Salida estructurada en espanol. Cuatro secciones fijas + disclaimer (ADR 0007)."""
+    """Salida estructurada: cuatro secciones fijas + disclaimer (ADR 0007)."""
 
     que_hace: str
     a_quien_afecta: str
