@@ -35,6 +35,9 @@ db/
 config.json
 *.key
 secrets/
+# Config real de la maquina (rutas al binario y al modelo). El template versionado
+# es leyllana.example.toml.
+leyllana.toml
 
 # ── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store

@@ -58,10 +58,14 @@ preset = "claude"
 #
 # command = ["codex", "exec", "-"]
 
-# Modelo a pedirle al CLI. Si lo deja vacio, manda el que ya tenga configurado
-# ese CLI. Se agrega como `--model <valor>`, que es el flag de los CLI probados;
-# si el suyo usa otro, pongalo directamente en `command`.
-# model = "sonnet"
+# Modelo a pedirle al CLI. Se agrega como `--model <valor>`, que es el flag de los
+# CLI probados; si el suyo usa otro, pongalo directamente en `command`. Si lo deja
+# vacio, manda el que ya tenga configurado ese CLI.
+#
+# Va el identificador completo, no el alias: `sonnet` a secas resuelve al Sonnet
+# mas nuevo y cambia solo cuando sale uno, que es justo lo que no se quiere en una
+# herramienta que debe dar la misma lectura de la misma ley.
+model = "claude-sonnet-4-6"
 
 # Segundos antes de cortar la llamada.
 timeout = 600
