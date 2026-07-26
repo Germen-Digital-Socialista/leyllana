@@ -18,6 +18,18 @@ def test_disclaimer_is_rendered_not_asked_of_the_model():
     assert DISCLAIMER in Explanation("q", "a", "art", "f").to_markdown()
 
 
+def test_publico_no_nombra_un_rol_concreto():
+    # Nombrar un rol en la descripcion de audiencia ("la presidenta de una junta
+    # de vecinos") hizo que un modelo chico lo tomara por materia de la norma y
+    # explicara una ley inexistente, pasando el parseo sin fallar. La audiencia va
+    # en abstracto; el tope de articulos, que es lo que hace legible la salida, se
+    # mantiene.
+    system = build("Articulo 1. Algo.", Nivel.PUBLICO).system
+    for rol in ("junta de vecinos", "presidenta", "alcalde", "senador"):
+        assert rol not in system.lower()
+    assert "cinco o seis" in system
+
+
 def test_build_is_pure():
     assert build("t", Nivel.TECNICO) == build("t", Nivel.TECNICO)
 

@@ -28,11 +28,15 @@ _NIVEL_INSTRUCTIONS: dict[Nivel, str] = {
     # El tope de articulos es deliberado: sin el, una ley larga produce un
     # catalogo de todo el articulado, fiel pero ilegible para quien no es
     # abogado, que es justamente el lector de este nivel.
+    #
+    # La audiencia se describe en abstracto a proposito. Nombrar un rol concreto
+    # aqui ("la presidenta de una junta de vecinos") hizo que un modelo chico lo
+    # tomara por materia de la norma y explicara una ley que no existe, con el
+    # rol inventado dentro de las cuatro secciones y sin que nada fallara.
     Nivel.PUBLICO: (
-        "Audiencia: publico general sin formacion juridica, por ejemplo la "
-        "presidenta de una junta de vecinos. Usa lenguaje llano y cotidiano, "
-        "frases cortas, y evita tecnicismos; si un termino legal es inevitable, "
-        "explicalo entre parentesis. No enumeres todo el articulado: en "
+        "Audiencia: una persona sin formacion juridica. Usa lenguaje llano y "
+        "cotidiano, frases cortas, y evita tecnicismos; si un termino legal es "
+        "inevitable, explicalo entre parentesis. No enumeres todo el articulado: en "
         "'Articulos clave' elige a lo mas cinco o seis articulos, los que de "
         "verdad le cambian algo a una persona comun, y deja fuera el resto. Si la "
         "norma no obliga a la gente comun sino al Estado o a cierto tipo de "
