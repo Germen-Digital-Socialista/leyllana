@@ -15,13 +15,19 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+from pathlib import Path
 
 from ..config import Config
 from ..prompt import Prompt
 from .base import ProviderError
 
-# Argv verificado de cada CLI probado. ``{system}`` marca donde va el system
-# prompt; el CLI que no tenga ese flag lo recibe al principio del stdin.
+# Argv verificado de cada CLI probado. ``{system_file}`` marca donde va la ruta
+# al archivo con el system prompt; el CLI que no tenga ese flag lo recibe al
+# principio del stdin.
+#
+# El system prompt va por archivo, nunca como argumento: en Windows el shim .cmd
+# corta un argumento multilinea en el primer salto de linea, y el modelo se queda
+# sin guardrail ni contrato de salida sin que nada falle de forma visible.
 PRESETS: dict[str, tuple[str, ...]] = {
     # --safe-mode apaga CLAUDE.md, skills, hooks, plugins y MCP sin tocar la auth
     # de la suscripcion. (--bare tambien apagaria todo eso, pero exige
@@ -34,14 +40,14 @@ PRESETS: dict[str, tuple[str, ...]] = {
         "",
         "--output-format",
         "text",
-        "--system-prompt",
-        "{system}",
+        "--system-prompt-file",
+        "{system_file}",
     ),
     # --quiet = --print --output-format text --final-message-only.
     "kimi": ("kimi", "--quiet"),
 }
 
-_SYSTEM_SLOT = "{system}"
+_SYSTEM_SLOT = "{system_file}"
 # Cuanto stderr se muestra cuando el CLI falla.
 _STDERR_TAIL = 500
 
@@ -82,22 +88,24 @@ class CliProvider:
     def generate(self, prompt: Prompt) -> str:
         """Corre el CLI con ``prompt`` y devuelve su respuesta de texto."""
         template = self._template()
-        if any(_SYSTEM_SLOT in arg for arg in template):
-            argv = [arg.replace(_SYSTEM_SLOT, prompt.system) for arg in template]
-            entrada = prompt.user
-        else:
-            argv = list(template)
-            entrada = f"{prompt.system}\n\n{prompt.user}"
+        usa_archivo = any(_SYSTEM_SLOT in arg for arg in template)
+        entrada = prompt.user if usa_archivo else f"{prompt.system}\n\n{prompt.user}"
 
-        binario = shutil.which(argv[0])
+        binario = shutil.which(template[0])
         if binario is None:
-            raise ProviderError(f"No se encontro el CLI {argv[0]!r} en el PATH.")
-        argv[0] = binario
+            raise ProviderError(f"No se encontro el CLI {template[0]!r} en el PATH.")
 
         # cwd neutro: el agente no tiene por que ver el repo desde donde se corre
         # leyllana (varios CLI auto-aprueban sus herramientas en modo no
-        # interactivo).
+        # interactivo). El system prompt vive en esa misma carpeta temporal.
         with tempfile.TemporaryDirectory() as cwd:
+            if usa_archivo:
+                ruta = Path(cwd) / "system.txt"
+                ruta.write_text(prompt.system, encoding="utf-8")
+                argv = [arg.replace(_SYSTEM_SLOT, str(ruta)) for arg in template]
+            else:
+                argv = list(template)
+            argv[0] = binario
             try:
                 proc = subprocess.run(  # noqa: S603 (argv de la config, sin shell)
                     argv,
