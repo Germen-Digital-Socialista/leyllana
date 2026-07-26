@@ -51,6 +51,20 @@ source-id -> local Qwen3 -> four sections), both single-pass and chunked.
     infracciones" en vez del numero, que ADR 0014 exige citar tal como aparece.
     El prompt de extraccion ya lo pide, asi que se pierde en la reduccion. Un
     solo caso; sin corregir a proposito, para no ajustar contra una muestra.
+- **El fallback de baja RAM (Qwen3-1.7B) inventa en normas largas. Medido, sin
+  decidir aun.** Misma ley, mismos 13 fragmentos, mismo ctx: 3 min, salida bien
+  formada, y **completamente falsa** las dos veces. Primera corrida: explico una
+  ley inexistente sobre los deberes de una junta de vecinos. Segunda: la explico
+  como una ley de impuestos, con "domicilio fiscal" y "recaudacion", palabras que
+  no estan en la fuente; se agarro de "unidades tributarias mensuales" y "a
+  beneficio fiscal" (las multas) y construyo un estatuto tributario alrededor.
+  Tambien ignoro el tope de articulos (11 en vez de cinco o seis). Las dos
+  corridas terminaron en codigo 0, con las cuatro secciones y el disclaimer: el
+  pipeline informo exito mientras emitia ficcion.
+  - Queda medido en una norma larga, no en una corta. ADR 0015 designa este modelo
+    como fallback y sigue vigente: la decision de cambiarlo necesita su propio ADR
+    y el cuadro completo, incluido el comportamiento en un boletin breve, que es
+    la mayor parte del corpus del piloto.
 - **Deferred follow-ups (minor, not blockers):** RAM-based auto-switch between the
   default and low-RAM model; a richer GPU auto-detect than the current
   `nvidia-smi` probe; and a persistent provider for the Phase 3 GUI.
