@@ -14,7 +14,7 @@ import unicodedata
 from ..config import Config
 from ..prompt import build, build_extract
 from ..types import Explanation, Nivel
-from .base import Provider
+from .base import ConsentRequired, Provider
 from .chunking import chars_for_tokens, estimate_tokens, split_structural
 from .registry import get_provider
 
@@ -37,18 +37,43 @@ _SECTION_FIELDS = (
 )
 
 
-def explain(text: str, nivel: Nivel, config: Config | None = None) -> Explanation:
+def explain(
+    text: str,
+    nivel: Nivel,
+    config: Config | None = None,
+    consent: bool = False,
+) -> Explanation:
     """Explica ``text`` en el ``nivel`` dado y devuelve una ``Explanation``.
 
     Orquesta prompt -> proveedor -> parseo. Si el texto no cabe en el contexto del
     modelo, primero se condensa con un map-reduce fiel (ADR 0017): se extraen puntos
     clave por fragmento y la sintesis final trabaja sobre esos puntos.
+
+    ``consent`` es la accion afirmativa que exige ADR 0013: sin ella, un proveedor
+    que saca el documento del equipo levanta ``ConsentRequired`` antes de enviar
+    nada. El proveedor local no la necesita ni la mira.
     """
     cfg = config if config is not None else Config()
     provider = get_provider(cfg)
+    _check_consent(provider, consent)
     condensed = _condense(text, provider, cfg)
     raw = provider.generate(build(condensed, nivel))
     return parse(raw)
+
+
+def _check_consent(provider: Provider, consent: bool) -> None:
+    """Corta el envio a la nube sin consentimiento explicito (ADR 0013).
+
+    Corre antes de la primera llamada al proveedor, asi que tampoco se envia el
+    primer fragmento del map-reduce.
+    """
+    if consent or not getattr(provider, "sends_to_cloud", False):
+        return
+    destino = getattr(provider, "destino", "un proveedor de nube")
+    raise ConsentRequired(
+        f"Este envio saca el documento de su equipo hacia {destino}. "
+        "Se requiere su consentimiento explicito antes de enviar nada."
+    )
 
 
 def _budget_tokens(config: Config) -> int:
@@ -139,4 +164,4 @@ def parse(raw: str) -> Explanation:
     return Explanation(**valores)
 
 
-__all__ = ["explain", "parse", "ParseError"]
+__all__ = ["explain", "parse", "ParseError", "ConsentRequired"]

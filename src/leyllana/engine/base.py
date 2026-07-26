@@ -21,6 +21,15 @@ class ProviderError(RuntimeError):
     """
 
 
+class ConsentRequired(RuntimeError):
+    """Falta el consentimiento explicito para enviar contenido a la nube (ADR 0013).
+
+    Se levanta antes del primer envio. Elegir un proveedor de nube en la config no
+    basta por si solo: cada corrida necesita una accion afirmativa del usuario, para
+    que un ajuste olvidado nunca mande solo un documento fuera del equipo.
+    """
+
+
 class Provider(Protocol):
     """Backend que convierte un ``Prompt`` en texto de respuesta."""
 

@@ -37,7 +37,9 @@ def test_cli_renders_fuente_block_above_sections(monkeypatch, capsys, tmp_path):
     info = SourceInfo(titulo="ESTABLECE BASES", tipo_norma="Ley 19880")
     monkeypatch.setattr(cli, "resolve_with_source", lambda s: ("texto", info))
     monkeypatch.setattr(
-        cli, "explain", lambda text, nivel, config: Explanation("q", "a", "art", "f")
+        cli,
+        "explain",
+        lambda text, nivel, config, consent: Explanation("q", "a", "art", "f"),
     )
     code = cli.main(["--paste", "x", "--config", str(tmp_path / "none.toml")])
     assert code == 0
@@ -52,7 +54,9 @@ def test_cli_no_fuente_block_for_paste(monkeypatch, capsys, tmp_path):
     from leyllana.types import Explanation
 
     monkeypatch.setattr(
-        cli, "explain", lambda text, nivel, config: Explanation("q", "a", "art", "f")
+        cli,
+        "explain",
+        lambda text, nivel, config, consent: Explanation("q", "a", "art", "f"),
     )
     code = cli.main(
         ["--paste", "Articulo 1. Texto suficiente para validar.",

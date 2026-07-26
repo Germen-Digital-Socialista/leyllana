@@ -14,7 +14,7 @@ import sys
 
 from . import __version__
 from .config import load
-from .engine import ParseError, explain
+from .engine import ConsentRequired, ParseError, explain
 from .engine.base import ProviderError
 from .input import resolve_with_source
 from .input.validation import ExtractionError
@@ -42,6 +42,15 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=[n.value for n in Nivel],
         default=Nivel.PUBLICO.value,
         help="registro de audiencia (por defecto: publico)",
+    )
+    parser.add_argument(
+        "--acepto-nube",
+        dest="acepto_nube",
+        action="store_true",
+        help=(
+            "confirma que acepta enviar el documento fuera de su equipo, al "
+            "proveedor de nube configurado (obligatorio para usarlo)"
+        ),
     )
     parser.add_argument(
         "--config",
@@ -80,7 +89,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load(args.config)
         text, info = resolve_with_source(_source_from_args(args))
-        explanation = explain(text, Nivel(args.nivel), config)
+        explanation = explain(text, Nivel(args.nivel), config, args.acepto_nube)
+    except ConsentRequired as exc:
+        print(
+            f"{exc} Repita el comando con --acepto-nube si esta de acuerdo.",
+            file=sys.stderr,
+        )
+        return 6
     except ExtractionError as exc:
         print(f"Entrada no utilizable: {exc}", file=sys.stderr)
         return 2
