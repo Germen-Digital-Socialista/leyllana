@@ -25,10 +25,19 @@ GUARDRAIL = (
 # Instrucciones de registro por nivel de audiencia (ADR 0007). Cambian tono y
 # profundidad, no los hechos.
 _NIVEL_INSTRUCTIONS: dict[Nivel, str] = {
+    # El tope de articulos es deliberado: sin el, una ley larga produce un
+    # catalogo de todo el articulado, fiel pero ilegible para quien no es
+    # abogado, que es justamente el lector de este nivel.
     Nivel.PUBLICO: (
-        "Audiencia: publico general sin formacion juridica. Usa lenguaje llano y "
-        "cotidiano, frases cortas, y evita tecnicismos; si un termino legal es "
-        "inevitable, explicalo entre parentesis."
+        "Audiencia: publico general sin formacion juridica, por ejemplo la "
+        "presidenta de una junta de vecinos. Usa lenguaje llano y cotidiano, "
+        "frases cortas, y evita tecnicismos; si un termino legal es inevitable, "
+        "explicalo entre parentesis. No enumeres todo el articulado: en "
+        "'Articulos clave' elige a lo mas cinco o seis articulos, los que de "
+        "verdad le cambian algo a una persona comun, y deja fuera el resto. Si la "
+        "norma no obliga a la gente comun sino al Estado o a cierto tipo de "
+        "empresas, dilo claramente en 'A quien afecta' en vez de dar a entender "
+        "que le aplica a cualquiera."
     ),
     Nivel.TECNICO: (
         "Audiencia: legisladores y asesores. Puedes usar el registro tecnico-"
