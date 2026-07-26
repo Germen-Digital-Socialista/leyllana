@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..types import DISCLAIMER, Nivel
+from ..types import Nivel
 
 # Guardrail anti-invencion (ADR 0008): el modelo solo puede resumir lo que esta
 # en el texto. Si el texto no alcanza, lo dice en vez de adivinar.
@@ -62,7 +62,8 @@ FORMATO = (
     "No agregues ninguna otra seccion, encabezado, introduccion ni cierre "
     "conversacional, y no te dirijas al lector con preguntas ni ofrecimientos. "
     "Si algo no esta en el texto, dilo dentro de la seccion que corresponda; no "
-    "abras una seccion aparte para lo que falta."
+    "abras una seccion aparte para lo que falta. Tampoco escribas un descargo de "
+    "responsabilidad al final: la aplicacion lo agrega sola."
 )
 
 
@@ -89,8 +90,7 @@ def build(text: str, nivel: Nivel) -> Prompt:
         "Responde SIEMPRE con estas cuatro secciones, en este orden, cada una "
         "empezando por su titulo exacto al inicio de una linea:\n"
         f"{secciones}\n\n"
-        f"{FORMATO}\n\n"
-        f"Cierra recordando al lector: {DISCLAIMER}"
+        f"{FORMATO}"
     )
     user = f"Texto de la norma o boletin a explicar:\n\n{text}"
     return Prompt(system=system, user=user)
