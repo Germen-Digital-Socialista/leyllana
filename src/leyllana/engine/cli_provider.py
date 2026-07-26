@@ -111,6 +111,10 @@ class CliProvider:
             else:
                 argv = list(template)
             argv[0] = binario
+            # ``--model`` es comun a los CLI probados; si su CLI usa otro flag,
+            # deje ``model`` vacio y pongalo directamente en ``command``.
+            if self._cfg.model:
+                argv += ["--model", self._cfg.model]
             try:
                 proc = subprocess.run(  # noqa: S603 (argv de la config, sin shell)
                     argv,

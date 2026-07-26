@@ -58,6 +58,11 @@ preset = "claude"
 #
 # command = ["codex", "exec", "-"]
 
+# Modelo a pedirle al CLI. Si lo deja vacio, manda el que ya tenga configurado
+# ese CLI. Se agrega como `--model <valor>`, que es el flag de los CLI probados;
+# si el suyo usa otro, pongalo directamente en `command`.
+# model = "sonnet"
+
 # Segundos antes de cortar la llamada.
 timeout = 600
 

@@ -96,6 +96,13 @@ def test_fuerza_utf8_en_las_tuberias_del_hijo(monkeypatch):
     assert visto["encoding"] == "utf-8"
 
 
+def test_model_se_agrega_solo_si_esta_configurado(corrida):
+    CliProvider(_config(preset="claude")).generate(PROMPT)
+    assert "--model" not in corrida.argv
+    CliProvider(_config(preset="claude", model="sonnet")).generate(PROMPT)
+    assert corrida.argv[-2:] == ["--model", "sonnet"]
+
+
 def test_sin_preset_ni_command_avisa(corrida):
     with pytest.raises(ProviderError, match="preset"):
         CliProvider(_config()).generate(PROMPT)

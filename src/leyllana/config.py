@@ -38,6 +38,7 @@ class CliConfig:
 
     preset: str | None = None
     command: tuple[str, ...] = ()
+    model: str | None = None
     timeout: float = 600.0
     ctx_tokens: int = 100_000
 
@@ -78,6 +79,7 @@ def _cli_from_dict(data: dict) -> CliConfig:
     return CliConfig(
         preset=data.get("preset"),
         command=tuple(data.get("command", ())),
+        model=data.get("model"),
         timeout=float(data.get("timeout", 600.0)),
         ctx_tokens=int(data.get("ctx_tokens", 100_000)),
     )
