@@ -109,6 +109,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0015 | Local model selection: Qwen3-4B default, Qwen3-1.7B fallback    | Accepted |
 | 0016 | Local llama.cpp runtime: managed llama-server subprocess        | Accepted |
 | 0017 | Long-document handling: structure-aware map-reduce              | Accepted |
+| 0018 | Subscription cloud providers driven as a headless CLI subprocess | Accepted (complements 0004, 0013) |
 
 ## Further reading
 

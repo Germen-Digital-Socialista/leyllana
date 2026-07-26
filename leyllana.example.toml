@@ -1,0 +1,66 @@
+# Configuracion de ejemplo de leyllana.
+#
+# Copie este archivo como `leyllana.toml` (se busca en el directorio actual) o
+# pase la ruta con `--config`. Si no hay archivo, se usan los valores por defecto
+# de abajo, que son los del proveedor local.
+
+[engine]
+# "local" (por defecto, ADR 0005: nada sale de su equipo) o "cli" (proveedor de
+# nube por suscripcion, ADR 0018). Los proveedores por API key todavia no estan
+# implementados.
+provider = "local"
+
+
+# ---------------------------------------------------------------------------
+# Proveedor local: llama-server + un modelo GGUF (ADR 0015, 0016)
+# ---------------------------------------------------------------------------
+
+# Ruta al binario `llama-server`. Es externo, no se instala con pip.
+# server_path = "C:/llama.cpp/llama-server.exe"
+
+# "auto" prueba GPU y cae a CPU, "cpu" fuerza CPU, "gpu" fuerza la descarga a GPU.
+gpu = "auto"
+
+# Generacion conservadora, para no inventar (ADR 0008).
+temperature = 0.2
+max_tokens = 1024
+# 0 = que decida llama.cpp.
+threads = 0
+
+[engine.models.default]
+# path = "C:/modelos/Qwen3-4B-Instruct-Q4_K_M.gguf"
+ctx = 4096
+
+[engine.models.fallback]
+# Modelo chico para equipos con poca RAM.
+# path = "C:/modelos/Qwen3-1.7B-Instruct-Q4_K_M.gguf"
+ctx = 2048
+
+
+# ---------------------------------------------------------------------------
+# Proveedor de nube por suscripcion (ADR 0018). Requiere provider = "cli".
+# ---------------------------------------------------------------------------
+#
+# Cada envio necesita ademas el flag --acepto-nube: elegir el proveedor aqui no
+# alcanza, el documento sale de su equipo (ADR 0013).
+
+[engine.cli]
+# Presets verificados de punta a punta: "claude" (Claude Code) y "kimi".
+preset = "claude"
+
+# Alternativa: cualquier otro agente CLI, sin codigo nuevo. `command` gana sobre
+# `preset`. Use el marcador {system_file} si el CLI tiene un flag para leer el
+# system prompt desde un archivo; si no lo tiene, se antepone a la entrada.
+#
+# El system prompt NUNCA va como argumento: en Windows un CLI instalado como
+# shim .cmd corta un argumento multilinea en el primer salto de linea, y el
+# modelo se queda sin el guardrail anti-invencion sin que nada falle a la vista.
+#
+# command = ["codex", "exec", "-"]
+
+# Segundos antes de cortar la llamada.
+timeout = 600
+
+# Contexto del modelo detras del CLI, para no trocear un documento que entra
+# entero (ADR 0017).
+ctx_tokens = 100000
