@@ -12,6 +12,7 @@ comandos de Windows.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -50,6 +51,10 @@ PRESETS: dict[str, tuple[str, ...]] = {
 _SYSTEM_SLOT = "{system_file}"
 # Cuanto stderr se muestra cuando el CLI falla.
 _STDERR_TAIL = 500
+# Un CLI escrito en Python usa por defecto la codepage ANSI de Windows en sus
+# tuberias: recibe el texto en UTF-8 como basura y devuelve cp1252. Forzar UTF-8
+# arregla las dos direcciones y no afecta a los CLI que no son Python.
+_CHILD_ENV = {"PYTHONIOENCODING": "utf-8"}
 
 
 class CliProvider:
@@ -116,6 +121,7 @@ class CliProvider:
                     errors="replace",
                     timeout=self._cfg.timeout,
                     cwd=cwd,
+                    env={**os.environ, **_CHILD_ENV},
                 )
             except (OSError, subprocess.SubprocessError) as exc:
                 raise ProviderError(
