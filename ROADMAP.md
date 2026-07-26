@@ -46,17 +46,32 @@ source-id -> local Qwen3 -> four sections), both single-pass and chunked.
   map-reduce completeness on the 4B default (only the 1.7B was measured).
 - Shaped by: ADR 0003, 0005, 0006, 0007, 0008, 0011, 0012, 0014, 0015, 0016, 0017.
 
-## Phase 2 — Cloud providers and terminal
-**Status: Not Started**
+## Phase 2 — Cloud via a subscription CLI
+**Status: Done**
 
-Make the engine swappable and add the side terminal.
+The cloud path works without an API key: leyllana drives an agent CLI as a
+subprocess and rides the user's existing subscription. Validated end to end on a
+real BCN norm with both shipped presets, in both audience levels.
 
-- Provider abstraction: Claude / OpenAI-Codex / Gemini via API key.
-- Explicit consent gate before any content leaves the machine for a cloud
-  provider (FR-5.1, ADR 0013).
-- Web-subscription path: driving provider CLIs from the embedded terminal.
-- `pywinpty` terminal panel (Windows first).
-- Shaped by: ADR 0003, 0004, 0013.
+- Generic `cli` provider (ADR 0018): argv from config, document on stdin, system
+  prompt by file. Any other agent CLI is a config line, not new code.
+- Verified presets: `claude` (Claude Code) and `kimi`. Codex and Gemini work
+  through an explicit `command` but ship no preset, because an untested preset is
+  a claim we cannot make.
+- Explicit consent gate before any content leaves the machine (FR-5.1,
+  ADR 0013), surfaced headless as `--acepto-nube`. The run aborts before the
+  first subprocess, so the map-reduce cannot leak a first fragment either.
+- The chunking budget now comes from the provider's own context, so a document
+  that fits in one cloud call is no longer split (ADR 0017).
+- `leyllana.example.toml` documents the options.
+- **Found while verifying, both silent (exit 0, plausible wrong Spanish):** a
+  multi-line system prompt in argv is truncated at the first newline by a Windows
+  `.cmd` shim, stripping the anti-invention guardrail; and a Python-based CLI
+  mangles accented Spanish on its pipes unless UTF-8 is forced. Both are fixed and
+  recorded as constraints in ADR 0018.
+- **Deliberately excluded:** API-key providers (now Phase 5) and the `pywinpty`
+  terminal panel (now Phase 3, with the GUI it belongs to).
+- Shaped by: ADR 0003, 0004, 0013, 0017, 0018.
 
 ## Phase 3 — GUI
 **Status: Not Started**
@@ -69,8 +84,12 @@ The PySide6 desktop app: source panel, result panel, embedded terminal, export.
 - Visual accessibility: light / dark themes, resizable type, adequate contrast.
 - Show the source identification block in the result panel when available
   (FR-7.1, display side).
-- Settings: engine/provider selection, API keys (stored locally only).
-- Shaped by: ADR 0002, 0004, 0007.
+- Settings: engine/provider selection, and the CLI preset for the subscription
+  path (ADR 0018).
+- Embedded `pywinpty` terminal panel (Windows first), for driving a provider CLI
+  by hand alongside the app (ADR 0004). Moved here from Phase 2: it is a Qt
+  widget and had no window to live in.
+- Shaped by: ADR 0002, 0004, 0007, 0018.
 
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
@@ -81,6 +100,18 @@ Ship something a non-technical user can install and run, then test it on real
 - Windows installer bundling the app + default model.
 - Pilot with a small set of real laws/bills and target readers.
 - Faithfulness spot-check pass (output invents nothing vs. source).
+
+## Phase 5 — Cloud providers by API key
+**Status: Not Started**
+
+The metered path, for users who have a key but no subscription. Deferred past the
+pilot on purpose: the subscription path of Phase 2 already covers the cloud need,
+so this should not hold up putting the tool in front of real readers.
+
+- Claude / OpenAI / Gemini via a key the user pastes, stored locally only.
+- Reuses the consent gate and the provider seam already built (ADR 0013, 0018);
+  the names are already in the registry with a clear not-implemented error.
+- Shaped by: ADR 0003, 0004, 0013.
 
 ---
 
