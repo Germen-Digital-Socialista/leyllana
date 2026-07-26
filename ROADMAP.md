@@ -117,6 +117,21 @@ so this should not hold up putting the tool in front of real readers.
 
 ## Deliberately deferred (candidate future GDS tools, not leyllana v1)
 
+- **Audience-specific output beyond the two `nivel` values.** Today `publico` and
+  `tecnico` change register (ADR 0007); the idea is to name the reader instead:
+  the president of a *junta de vecinos*, an *alcalde* or municipal team, a
+  legislator or their staff. Each wants a different thing from the same norm.
+  Ley 21.663 is the case that surfaced it: the honest answer for a dirigenta is
+  "esto no te obliga a ti", while a legislator wants the articulado and the
+  fiscalization regime. Cheap to build (prompt and output contract only, no new
+  dependency) but it changes ADR 0007, so it needs its own ADR and a design pass
+  first. Not designed yet, on purpose.
+- **A retrieval layer.** Tracked separately from the audience idea above, because
+  the costs are not comparable: answering "how does this affect *your* comuna"
+  needs context the source document does not contain (municipal competencies,
+  budget, who fiscalizes), which means a corpus, an index, a dependency, and a
+  much harder anti-invention problem than summarizing one text (ADR 0008). The
+  audience framing needs none of that.
 - Multi-law comparison / redline diffing.
 - Q&A over a law with cited articles.
 - Legislative tracking / scanning for new AI-related *boletines*.
