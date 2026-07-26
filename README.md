@@ -41,18 +41,45 @@ La entrada llega como tú la tengas: un archivo (`.txt` o `.pdf`), texto pegado,
 
 Por defecto, leyllana usa un modelo de lenguaje **local**, en tu propio computador, sin conexión. La misma decisión que tomamos en MuniGPT: los datos no se van a una nube ajena. Entender la ley no debería depender de un servidor en otro país ni de una suscripción.
 
-Si quieres más potencia, puedes conectar un proveedor en la nube (Claude, Codex, Gemini), con tu clave de *API* o directamente con tu suscripción a través de la terminal que la aplicación trae al lado. Pero eso es opción tuya, no requisito. Sin conexión, la herramienta igual funciona de principio a fin.
+Si quieres más potencia, hay nube, y no necesitas pagar una *API* para usarla. Si ya tienes una suscripción a Claude o a Kimi, leyllana maneja el CLI de esa suscripción por ti y aprovecha lo que ya estás pagando. Cualquier otro agente de terminal se enchufa con una línea de configuración, sin código nuevo.
+
+Eso sí, nada sale de tu computador en silencio. Cada envío a la nube hay que autorizarlo en ese mismo comando, con `--acepto-nube`. ¿Se te olvidó el *flag*? No se manda nada, y te lo dice. Las claves de *API* vienen más adelante; hoy no te hacen falta.
 
 Dos reglas que no se transan:
 
 1. **No inventa.** El modelo solo resume lo que está en el texto que le diste. Si el texto no alcanza para responder algo, lo dice, no lo rellena.
 2. **No es asesoría legal.** Cada explicación lo lleva escrito. leyllana te ayuda a entender; para una decisión legal, habla con un abogado.
 
+## Cómo se usa hoy
+
+Todavía no hay ventana, así que por ahora se trabaja desde la terminal:
+
+```bash
+# instala, con el extra que hace falta para leer PDF
+uv sync --extra pdf
+
+# copia la configuración de ejemplo y apúntala a tu modelo local
+cp leyllana.example.toml leyllana.toml
+
+# una norma desde el sitio oficial de la BCN
+uv run leyllana --url "https://www.bcn.cl/leychile/navegar?idNorma=1194515" --nivel publico
+
+# un PDF que tengas guardado, en registro técnico
+uv run leyllana --file proyecto.pdf --nivel tecnico
+
+# con tu suscripción en la nube, autorizando el envío
+uv run leyllana --file proyecto.pdf --acepto-nube
+```
+
+`leyllana.example.toml` viene comentado línea por línea: qué modelo local usar, o qué CLI de suscripción manejar.
+
 ## Estado
 
-Acceso anticipado. Este repositorio, por ahora, contiene el diseño completo: la visión (`PRD.md`), la hoja de ruta (`ROADMAP.md`) y las decisiones de arquitectura (`docs/adr/`). El código viene por fases, y cada fase está escrita en la hoja de ruta para que cualquiera pueda seguirla, o meter mano.
+Acceso anticipado, pero ya no es solo diseño. El motor funciona de principio a fin: le das una ley, eliges el nivel, y salen las cuatro secciones con su fuente identificada arriba. Está probado contra normas reales de la BCN, tanto con el modelo local como con la nube por suscripción.
 
-Si quieres aportar, empieza por ahí.
+Lo que falta es la cara. La interfaz gráfica es la fase 3, y el instalador para quien no quiere saber nada de terminales es la 4.
+
+El diseño completo sigue publicado y al día: la visión (`PRD.md`), la hoja de ruta (`ROADMAP.md`) y las decisiones de arquitectura (`docs/adr/`), una por cada cosa que se decidió y por qué se decidió así. Si quieres aportar, empieza por ahí.
 
 ## Germen Digital Socialista
 
