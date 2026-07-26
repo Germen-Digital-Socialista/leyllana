@@ -40,10 +40,20 @@ source-id -> local Qwen3 -> four sections), both single-pass and chunked.
 - Output carries source identification (title, norm type, issuing body, date,
   URL, consultation date) when extractable, never invented (FR-7.1); captured in
   the same fetch that reads the text.
+- **Map-reduce on the 4B default: measured.** Ley 21.663 (99.468 caracteres, 55
+  articulos) via 13 fragmentos, GPU: **50 min**, sin inventar nada. Las
+  comprobaciones puntuales contra la fuente pasan (articulo 53, articulo 4 y la
+  facultad de la Agencia, el tramo de 5.000 a 40.000 UTM). Dos hallazgos:
+  - La lectura es mas delgada que la de un proveedor de nube en una sola pasada:
+    cita 4 articulos en vez de 6 y deja fuera los plazos de reporte y el control
+    judicial sobre el acceso de la Agencia.
+  - **Se perdio un identificador**: la sintesis escribio "el articulo sobre
+    infracciones" en vez del numero, que ADR 0014 exige citar tal como aparece.
+    El prompt de extraccion ya lo pide, asi que se pierde en la reduccion. Un
+    solo caso; sin corregir a proposito, para no ajustar contra una muestra.
 - **Deferred follow-ups (minor, not blockers):** RAM-based auto-switch between the
   default and low-RAM model; a richer GPU auto-detect than the current
-  `nvidia-smi` probe; a persistent provider for the Phase 3 GUI; and measuring the
-  map-reduce completeness on the 4B default (only the 1.7B was measured).
+  `nvidia-smi` probe; and a persistent provider for the Phase 3 GUI.
 - Shaped by: ADR 0003, 0005, 0006, 0007, 0008, 0011, 0012, 0014, 0015, 0016, 0017.
 
 ## Phase 2 — Cloud via a subscription CLI
@@ -100,6 +110,12 @@ Ship something a non-technical user can install and run, then test it on real
 - Windows installer bundling the app + default model.
 - Pilot with a small set of real laws/bills and target readers.
 - Faithfulness spot-check pass (output invents nothing vs. source).
+- **Decide here what to do about local speed on long norms.** Measured in Phase 1:
+  50 minutes for a 55-article law on the 4B default. Most pilot documents are far
+  shorter, and the Phase 3 GUI already commits to a progress indicator and a cancel
+  control (FR-10), which is the mitigation. If the pilot shows the wait is a real
+  obstacle for readers, the levers are a larger context (fewer fragments) or
+  routing long documents to the subscription CLI path (ADR 0018).
 
 ## Phase 5 — Cloud providers by API key
 **Status: Not Started**
