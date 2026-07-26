@@ -76,10 +76,15 @@ def _check_consent(provider: Provider, consent: bool) -> None:
     )
 
 
-def _budget_tokens(config: Config) -> int:
-    """Tokens de texto que caben dejando espacio al system prompt y a la salida."""
+def _budget_tokens(config: Config, provider: Provider) -> int:
+    """Tokens de texto que caben dejando espacio al system prompt y a la salida.
+
+    El contexto lo pone el proveedor cuando lo declara (un CLI de nube tiene mucho
+    mas que el modelo local, ADR 0018); si no, manda el del modelo local.
+    """
     engine = config.engine
-    return engine.default_model.ctx - engine.max_tokens - _SYSTEM_RESERVE_TOKENS
+    ctx = getattr(provider, "ctx_tokens", None) or engine.default_model.ctx
+    return ctx - engine.max_tokens - _SYSTEM_RESERVE_TOKENS
 
 
 def _condense(
@@ -91,7 +96,7 @@ def _condense(
     fragmentos por estructura, se extraen puntos clave fieles de cada uno (map) y se
     juntan; si el conjunto aun no cabe, se reduce jerarquicamente hasta un tope.
     """
-    budget = _budget_tokens(config)
+    budget = _budget_tokens(config, provider)
     if estimate_tokens(text) <= budget or budget <= 0:
         return text
 
