@@ -27,6 +27,22 @@ class ModelConfig:
 
 
 @dataclass(frozen=True)
+class CliConfig:
+    """Un agente CLI de suscripcion manejado como subproceso (ADR 0018).
+
+    ``preset`` nombra un CLI ya verificado; ``command`` da el argv completo para
+    cualquier otro y gana si vienen los dos. ``ctx_tokens`` es el presupuesto de
+    contexto del modelo detras del CLI, para que el map-reduce (ADR 0017) no
+    trocee un documento que entra entero.
+    """
+
+    preset: str | None = None
+    command: tuple[str, ...] = ()
+    timeout: float = 600.0
+    ctx_tokens: int = 100_000
+
+
+@dataclass(frozen=True)
 class EngineConfig:
     """Seleccion de proveedor, modelos y ejecucion del llama-server (ADR 0016).
 
@@ -39,6 +55,7 @@ class EngineConfig:
     provider: str = "local"
     default_model: ModelConfig = field(default_factory=ModelConfig)
     fallback_model: ModelConfig = field(default_factory=lambda: ModelConfig(ctx=2048))
+    cli: CliConfig = field(default_factory=CliConfig)
     server_path: str | None = None
     gpu: str = "auto"
     temperature: float = 0.2
@@ -55,6 +72,15 @@ class Config:
 
 def _model_from_dict(data: dict) -> ModelConfig:
     return ModelConfig(path=data.get("path"), ctx=int(data.get("ctx", 4096)))
+
+
+def _cli_from_dict(data: dict) -> CliConfig:
+    return CliConfig(
+        preset=data.get("preset"),
+        command=tuple(data.get("command", ())),
+        timeout=float(data.get("timeout", 600.0)),
+        ctx_tokens=int(data.get("ctx_tokens", 100_000)),
+    )
 
 
 def load(path: str | Path | None = None) -> Config:
@@ -75,6 +101,7 @@ def load(path: str | Path | None = None) -> Config:
         provider=engine_data.get("provider", "local"),
         default_model=_model_from_dict(models_data.get("default", {})),
         fallback_model=_model_from_dict(models_data.get("fallback", {"ctx": 2048})),
+        cli=_cli_from_dict(engine_data.get("cli", {})),
         server_path=engine_data.get("server_path"),
         gpu=engine_data.get("gpu", "auto"),
         temperature=float(engine_data.get("temperature", 0.2)),
