@@ -55,6 +55,16 @@ _SECTIONS = (
     "En una frase: una sola frase con la idea central.",
 )
 
+# El contrato de salida es cerrado (ADR 0007): cuatro secciones y nada mas. Sin
+# esto, un modelo conversacional responde con sus propios encabezados y agrega
+# comentarios al lector, y el parseo no encuentra las secciones.
+FORMATO = (
+    "No agregues ninguna otra seccion, encabezado, introduccion ni cierre "
+    "conversacional, y no te dirijas al lector con preguntas ni ofrecimientos. "
+    "Si algo no esta en el texto, dilo dentro de la seccion que corresponda; no "
+    "abras una seccion aparte para lo que falta."
+)
+
 
 @dataclass(frozen=True)
 class Prompt:
@@ -69,15 +79,17 @@ def build(text: str, nivel: Nivel) -> Prompt:
 
     Pura: mismas entradas -> mismo prompt, sin I/O.
     """
-    secciones = "\n".join(f"- {s}" for s in _SECTIONS)
+    secciones = "\n".join(_SECTIONS)
     system = (
         "Eres leyllana, un asistente que explica leyes y boletines chilenos en "
         "lenguaje llano (espanol de Chile).\n\n"
         f"{GUARDRAIL}\n\n"
         f"{CITATION}\n\n"
         f"{_NIVEL_INSTRUCTIONS[nivel]}\n\n"
-        "Responde SIEMPRE con estas cuatro secciones, en este orden y con estos "
-        f"titulos:\n{secciones}\n\n"
+        "Responde SIEMPRE con estas cuatro secciones, en este orden, cada una "
+        "empezando por su titulo exacto al inicio de una linea:\n"
+        f"{secciones}\n\n"
+        f"{FORMATO}\n\n"
         f"Cierra recordando al lector: {DISCLAIMER}"
     )
     user = f"Texto de la norma o boletin a explicar:\n\n{text}"
@@ -104,4 +116,4 @@ def build_extract(chunk: str) -> Prompt:
     return Prompt(system=system, user=user)
 
 
-__all__ = ["Prompt", "build", "build_extract", "GUARDRAIL", "CITATION"]
+__all__ = ["Prompt", "build", "build_extract", "GUARDRAIL", "CITATION", "FORMATO"]
