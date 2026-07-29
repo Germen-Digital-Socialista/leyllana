@@ -46,7 +46,12 @@ These apply to all work here, exactly as they do across Felipe's repos:
   question, decline and defer to a qualified lawyer.
 - **Present decisions as interactive options** (the arrow-selectable question
   UI), not plain-text lists, whenever offering Felipe a choice — with exactly
-  one option marked "(Recommended)" first, and the reasoning stated.
+  one option marked "(Recommended)" first, and the reasoning stated. **This
+  covers anything that implicitly asks him to pick or decide, not only formal
+  questions:** "what to look at next", "here are the remaining steps", "you
+  could do A or B", a checklist at the end of a summary. If a message contains
+  a choice in prose, it is in the wrong place. More than four options means
+  chaining sequential calls, never dropping to text.
 - **New-project doc structure** is PRD -> ROADMAP -> ADR, already used across
   Felipe's repos. ROADMAP is phase-based (Not Started / In Progress / Blocked /
   Done), not calendar-dated. ADRs are MADR-lite, numbered `000N-title.md`, and
