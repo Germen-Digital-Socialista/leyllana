@@ -73,26 +73,27 @@ def test_pasada_unica_no_reporta_fragmentos():
     exp, eventos = _run("Articulo 1. Texto breve que cabe sobrado.", _FakeProvider())
     assert isinstance(exp, Explanation)
     etapas = [e.stage for e in eventos]
-    assert Stage.EXTRAYENDO not in etapas  # no hubo map: nada que contar
+    assert Stage.ANALIZANDO not in etapas  # no hubo map: nada que contar
     assert Stage.GENERANDO in etapas
     assert all(e.fragmento is None for e in eventos)
 
 
 def test_documento_largo_reporta_fragmento_de_total():
     _, eventos = _run(_LONG_TEXT, _FakeProvider())
-    extraccion = [e for e in eventos if e.stage is Stage.EXTRAYENDO]
-    assert len(extraccion) >= 2
-    total = extraccion[0].total
+    fragmentos = [e for e in eventos if e.fragmento is not None]
+    assert len(fragmentos) >= 2
+    total = fragmentos[0].total
     # El total es el mismo en todos y los fragmentos van 1..total, sin saltos.
-    assert [e.fragmento for e in extraccion] == list(range(1, len(extraccion) + 1))
-    assert all(e.total == total for e in extraccion)
-    assert len(extraccion) == total
+    assert [e.fragmento for e in fragmentos] == list(range(1, len(fragmentos) + 1))
+    assert all(e.total == total for e in fragmentos)
+    assert all(e.stage is Stage.ANALIZANDO for e in fragmentos)
+    assert len(fragmentos) == total
 
 
 def test_las_etapas_llegan_en_orden():
     _, eventos = _run(_LONG_TEXT, _FakeProvider())
     etapas = [e.stage for e in eventos]
-    assert etapas.index(Stage.EXTRAYENDO) < etapas.index(Stage.GENERANDO)
+    assert etapas.index(Stage.ANALIZANDO) < etapas.index(Stage.GENERANDO)
     assert etapas.index(Stage.GENERANDO) < etapas.index(Stage.VERIFICANDO)
 
 
@@ -131,9 +132,10 @@ def test_check_y_report_sin_destinatario_no_hacen_nada():
 
 def test_texto_de_progreso_no_inventa_porcentaje():
     assert Progress(Stage.ANALIZANDO).texto() == "analizando"
-    assert Progress(Stage.EXTRAYENDO, 3, 13).texto() == (
-        "extrayendo texto (fragmento 3 de 13)"
+    assert Progress(Stage.ANALIZANDO, 3, 13).texto() == (
+        "analizando (fragmento 3 de 13)"
     )
+    assert Progress(Stage.EXTRAYENDO).texto() == "extrayendo texto"
     assert Progress(Stage.ANALIZANDO, detalle="reduccion 1").texto() == (
         "analizando: reduccion 1"
     )

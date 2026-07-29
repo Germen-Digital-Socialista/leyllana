@@ -145,7 +145,7 @@ def _condense(
     points: list[str] = []
     for i, chunk in enumerate(chunks, start=1):
         check(cancel)
-        report(progress, Stage.EXTRAYENDO, fragmento=i, total=total)
+        report(progress, Stage.ANALIZANDO, fragmento=i, total=total)
         points.append(provider.generate(build_extract(chunk), cancel=cancel).strip())
     pooled = "\n".join(p for p in points if p)
 

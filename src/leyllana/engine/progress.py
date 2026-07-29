@@ -22,13 +22,17 @@ from enum import StrEnum
 
 
 class Stage(StrEnum):
-    """Etapas visibles de una corrida, con los nombres que fija PRD FR-10."""
+    """Etapas visibles de una corrida, con los nombres que fija PRD FR-10.
+
+    Las dos primeras son de la capa de entrada (abrir el archivo o traer la URL, y
+    sacar el texto del PDF o pasarle OCR); las tres ultimas son del engine.
+    """
 
     CARGANDO = "cargando"
     EXTRAYENDO = "extrayendo texto"
     ANALIZANDO = "analizando"
-    VERIFICANDO = "verificando"
     GENERANDO = "generando resultado"
+    VERIFICANDO = "verificando"
 
 
 @dataclass(frozen=True)
