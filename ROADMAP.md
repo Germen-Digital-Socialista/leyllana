@@ -138,12 +138,30 @@ Installed as the `gui` extra (`uv sync --extra gui`), run with `leyllana-gui` or
   pywinpty 3.0.5: spawns a shell, echoes, terminates. **It is a text view, not a
   VT emulator** — ANSI escapes are stripped rather than interpreted, so a
   full-screen program (vim, htop) will look wrong. Off Windows, or without
-  pywinpty, the dock shows the reason and the rest of the app is unaffected.
+  pywinpty, it writes the reason into the view and keeps working for the job
+  below.
+- **The terminal panel is also where you see what left the machine (ADR 0022).**
+  ADR 0004 made it the cloud path; ADR 0018 replaced that with a headless
+  subprocess and left the panel connected to nothing, so a consented send
+  happened entirely out of sight. A cloud run now prints the exact argv, the
+  payload size marked as leaving the machine, the response, and the exit code and
+  elapsed time, and the dock opens by itself when consent is given. The document
+  text is never printed; its size is. The response arrives when the process
+  exits, not token by token, because `communicate()` is what keeps the cancel
+  polling deadlock-free.
+- **Visual pass done, and it caught a silent bug.** `setDefaultStyleSheet` has no
+  effect on `setMarkdown` content — Qt only applies it to `setHtml` — so the
+  first stylesheet was ignored without any error. Formatting is now applied over
+  the document blocks: section headings above the body, the Fuente block below it
+  and dim, and fragment-level formatting so the source URL keeps its link colour.
+  Before the pass the provenance block filled the first third of the panel; three
+  sections now fit above the fold. All presentation only, with a test pinning the
+  export to what the CLI prints.
 - **Closed from Phase 1's deferred list:** the persistent provider. One provider
   lives for the window's session, so only the first run pays the GGUF load.
 - **Still deferred from Phase 1:** RAM-based auto-switch between the default and
   low-RAM model, and a richer GPU auto-detect than the `nvidia-smi` probe.
-- Shaped by: ADR 0002, 0004, 0007, 0013, 0018, 0019, 0020, 0021.
+- Shaped by: ADR 0002, 0004, 0007, 0013, 0018, 0019, 0020, 0021, 0022.
 
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**

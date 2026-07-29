@@ -75,7 +75,9 @@ Por eso Cancelar tenía que servir para algo. Mientras el modelo escribe, corta 
 
 Los ajustes, qué motor, qué modelo, qué CLI, el tema claro u oscuro, el tamaño de la letra, se guardan en el mismo `leyllana.toml` que lee la terminal. Lo que cambias en la ventana lo ve el comando, y al revés. Nunca dos verdades.
 
-Abajo hay un panel de terminal plegable, por si quieres manejar a mano el CLI de tu suscripción sin salir de la aplicación. Por ahora solo en Windows.
+Abajo hay un panel de terminal plegable, con el interruptor a la vista en la barra de abajo. Sirve para dos cosas. Una es manejar a mano el CLI de tu suscripción sin salir de la aplicación: autenticarte, mirar cuánto te queda. Por ahora eso solo en Windows.
+
+La otra importa más. Ahí se ve **lo que de verdad salió de tu computador**. Cuando autorizas un envío a la nube, el panel se abre solo y te muestra el comando exacto que se ejecutó y cuántos caracteres se mandaron, y después la respuesta y en cuánto tiempo. El texto de la ley no se imprime, su tamaño sí. Decirte "nada sale sin tu permiso" y no dejarte comprobarlo es pedirte que nos creas. Preferimos que mires.
 
 Y si prefieres la terminal, está entera:
 
