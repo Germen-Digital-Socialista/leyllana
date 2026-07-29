@@ -36,38 +36,36 @@ def test_resolve_gpu_auto_detects_nvidia(monkeypatch):
     assert server_mod.resolve_gpu_layers("auto") == 0
 
 
-def test_chat_completion_returns_content(monkeypatch):
-    def fake(url, payload=None, *, timeout):
-        assert url.endswith("/v1/chat/completions")
-        assert payload["stream"] is False
-        assert payload["chat_template_kwargs"] == {"enable_thinking": False}
-        return {"choices": [{"message": {"content": "hola mundo"}}]}
+# La lectura de la respuesta paso a ser en streaming (ADR 0020) y se prueba
+# entera en test_streaming.py: tramas SSE, trama rota, cancelacion y respuesta
+# vacia. Aqui queda lo propio de este modulo: el arranque del servidor.
 
-    monkeypatch.setattr(server_mod, "_http_json", fake)
-    out = server_mod.chat_completion(
-        "http://127.0.0.1:1", [{"role": "user", "content": "hi"}],
-        temperature=0.2, max_tokens=10,
+
+def test_health_check_usa_http_json(monkeypatch):
+    # _http_json quedo solo para el /health del arranque; el chat ya no pasa por
+    # ahi. Si alguien lo borra por "no usado", esto lo delata.
+    llamadas = []
+    monkeypatch.setattr(
+        server_mod,
+        "_http_json",
+        lambda url, payload=None, *, timeout: llamadas.append(url)
+        or {"status": "ok"},
     )
-    assert out == "hola mundo"
+    srv = server_mod.LlamaServer("srv", "m.gguf", ctx=2048, gpu="cpu", threads=0)
+    srv._base = "http://fake"
+    srv._wait_healthy(timeout=1.0)
+    assert llamadas == ["http://fake/health"]
 
 
-def test_chat_completion_http_error_raises_provider_error(monkeypatch):
+def test_health_check_agotado_avisa(monkeypatch):
     def boom(*args, **kwargs):
-        raise urllib.error.URLError("conexion rechazada")
+        raise urllib.error.URLError("aun arrancando")
 
     monkeypatch.setattr(server_mod, "_http_json", boom)
-    with pytest.raises(ProviderError):
-        server_mod.chat_completion(
-            "http://127.0.0.1:1", [], temperature=0.2, max_tokens=10
-        )
-
-
-def test_chat_completion_malformed_response_raises(monkeypatch):
-    monkeypatch.setattr(server_mod, "_http_json", lambda *a, **k: {"nope": 1})
-    with pytest.raises(ProviderError):
-        server_mod.chat_completion(
-            "http://127.0.0.1:1", [], temperature=0.2, max_tokens=10
-        )
+    srv = server_mod.LlamaServer("srv", "m.gguf", ctx=2048, gpu="cpu", threads=0)
+    srv._base = "http://fake"
+    with pytest.raises(ProviderError, match="no quedo listo"):
+        srv._wait_healthy(timeout=0.1)
 
 
 def test_generate_builds_messages_and_returns_content(monkeypatch):

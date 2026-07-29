@@ -16,12 +16,13 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from ..config import Config
 from ..prompt import Prompt
 from .base import ProviderError
-from .progress import CancelToken
+from .progress import Cancelled, CancelToken
 
 # Argv verificado de cada CLI probado. ``{system_file}`` marca donde va la ruta
 # al archivo con el system prompt; el CLI que no tenga ese flag lo recibe al
@@ -52,6 +53,11 @@ PRESETS: dict[str, tuple[str, ...]] = {
 _SYSTEM_SLOT = "{system_file}"
 # Cuanto stderr se muestra cuando el CLI falla.
 _STDERR_TAIL = 500
+# Cada cuanto se deja de esperar al CLI para mirar si el usuario cancelo. Un
+# subproceso no se puede leer a medias como un flujo de tokens (ADR 0020), asi que
+# aqui la cancelacion es un sondeo: se espera un poco, se mira, se vuelve a
+# esperar. Un segundo es imperceptible al lado de una llamada de nube.
+_CANCEL_POLL = 1.0
 # Un CLI escrito en Python usa por defecto la codepage ANSI de Windows en sus
 # tuberias: recibe el texto en UTF-8 como basura y devuelve cp1252. Forzar UTF-8
 # arregla las dos direcciones y no afecta a los CLI que no son Python.
@@ -117,14 +123,14 @@ class CliProvider:
             if self._cfg.model:
                 argv += ["--model", self._cfg.model]
             try:
-                proc = subprocess.run(  # noqa: S603 (argv de la config, sin shell)
+                proc = subprocess.Popen(  # noqa: S603 (argv de la config, sin shell)
                     argv,
-                    input=entrada,
-                    capture_output=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    timeout=self._cfg.timeout,
                     cwd=cwd,
                     env={**os.environ, **_CHILD_ENV},
                 )
@@ -132,14 +138,62 @@ class CliProvider:
                 raise ProviderError(
                     f"Fallo la llamada al CLI {argv[0]}: {exc}"
                 ) from exc
+            salida_std, salida_err = self._comunicar(proc, entrada, argv[0], cancel)
 
         if proc.returncode != 0:
-            cola = (proc.stderr or "").strip()[-_STDERR_TAIL:]
+            cola = (salida_err or "").strip()[-_STDERR_TAIL:]
             raise ProviderError(f"El CLI termino con codigo {proc.returncode}: {cola}")
-        salida = (proc.stdout or "").strip()
+        salida = (salida_std or "").strip()
         if not salida:
             raise ProviderError("El CLI no devolvio texto.")
         return salida
+
+    def _comunicar(
+        self,
+        proc: subprocess.Popen,
+        entrada: str,
+        nombre: str,
+        cancel: CancelToken | None,
+    ) -> tuple[str, str]:
+        """Espera al CLI sin quedarse sordo a la cancelacion ni al timeout.
+
+        ``communicate`` se reintenta tras un ``TimeoutExpired`` sin perder salida
+        (asi esta documentado en la stdlib), y solo la primera llamada lleva el
+        stdin. Entre reintento y reintento se mira el token de cancelacion; si se
+        cancelo, se mata al CLI en vez de esperar los diez minutos del timeout.
+        """
+        limite = time.monotonic() + self._cfg.timeout
+        primera = True
+        while True:
+            try:
+                return proc.communicate(
+                    entrada if primera else None, timeout=_CANCEL_POLL
+                )
+            except subprocess.TimeoutExpired:
+                primera = False
+                if cancel is not None and cancel.is_cancelled():
+                    self._matar(proc)
+                    raise Cancelled(
+                        "La explicacion fue cancelada por el usuario."
+                    ) from None
+                if time.monotonic() > limite:
+                    self._matar(proc)
+                    raise ProviderError(
+                        f"El CLI {nombre} no respondio en "
+                        f"{self._cfg.timeout:.0f}s."
+                    ) from None
+            except (OSError, subprocess.SubprocessError) as exc:
+                self._matar(proc)
+                raise ProviderError(f"Fallo la llamada al CLI {nombre}: {exc}") from exc
+
+    @staticmethod
+    def _matar(proc: subprocess.Popen) -> None:
+        """Mata al CLI y recoge sus tuberias, para no dejar un huerfano escribiendo."""
+        proc.kill()
+        try:
+            proc.communicate(timeout=_CANCEL_POLL)
+        except (subprocess.SubprocessError, OSError, ValueError):
+            pass
 
 
 __all__ = ["CliProvider", "PRESETS"]

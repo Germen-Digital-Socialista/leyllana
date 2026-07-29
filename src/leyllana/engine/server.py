@@ -7,6 +7,12 @@ subproceso gestionado y se le habla por su API compatible con OpenAI
 chat propia del GGUF (correcta para Qwen3). Toda la comunicacion es a ``localhost``
 con la biblioteca estandar (``urllib``): el backend de servidor no necesita
 dependencias pip, solo el binario externo.
+
+La respuesta se lee **en streaming** (ADR 0020). Con la llamada de una sola pieza
+que habia antes, una corrida de 50 minutos no se podia interrumpir en absoluto:
+el proceso quedaba bloqueado en un ``urlopen`` hasta el timeout. Leyendo el flujo
+token a token se puede mirar la senal de cancelacion entre uno y otro, que es lo
+que hace que el boton Cancelar de la GUI signifique algo (PRD FR-10).
 """
 
 from __future__ import annotations
@@ -19,16 +25,19 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 
 from .base import ProviderError
-from .progress import CancelToken
+from .progress import Cancelled, CancelToken
 
 # El arranque en frio incluye cargar el GGUF; en CPU puede tardar (ADR 0015).
 _HEALTH_TIMEOUT = 180.0
 _REQUEST_TIMEOUT = 600.0
 # Descarga "todo a GPU" cuando hay GPU; en un build CPU-only es inofensivo.
 _GPU_ALL_LAYERS = 999
+# Marca de fin del flujo SSE en la API compatible con OpenAI.
+_SSE_DONE = "[DONE]"
 
 
 def _free_port() -> int:
@@ -63,6 +72,28 @@ def _http_json(url: str, payload: dict | None = None, *, timeout: float) -> dict
         return json.loads(resp.read().decode("utf-8"))
 
 
+def sse_delta(line: bytes | str) -> str | None:
+    """Extrae el trozo de texto de una linea SSE, o ``None`` si no trae ninguno.
+
+    Devuelve ``None`` para las lineas en blanco que separan eventos, para la marca
+    de fin, y para cualquier trama que no se pueda leer. Una trama rota se salta en
+    silencio en vez de tumbar la corrida: el flujo sigue y lo que se pierde es un
+    token, no la explicacion entera.
+    """
+    texto = line.decode("utf-8", "replace") if isinstance(line, bytes) else line
+    texto = texto.strip()
+    if not texto.startswith("data:"):
+        return None
+    cuerpo = texto[len("data:") :].strip()
+    if not cuerpo or cuerpo == _SSE_DONE:
+        return None
+    try:
+        obj = json.loads(cuerpo)
+        return obj["choices"][0]["delta"].get("content") or None
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError):
+        return None
+
+
 def chat_completion(
     base_url: str,
     messages: list[dict],
@@ -71,27 +102,57 @@ def chat_completion(
     max_tokens: int,
     timeout: float = _REQUEST_TIMEOUT,
     cancel: CancelToken | None = None,
+    on_token: Callable[[str], None] | None = None,
 ) -> str:
-    """Llama ``/v1/chat/completions`` (no streaming) y devuelve el texto asistente.
+    """Llama ``/v1/chat/completions`` en streaming y devuelve el texto completo.
 
+    Lee la respuesta trama a trama y consulta ``cancel`` entre una y otra, asi que
+    cancelar corta en el siguiente token en vez de esperar al final. La unica
+    ventana en que no responde de inmediato es el procesado del prompt, antes del
+    primer token: ahi todavia no llega nada que leer. Se dice aqui porque un boton
+    que promete detener algo y no lo hace es peor que no tenerlo.
+
+    ``on_token`` recibe cada trozo segun llega, para un indicador vivo.
     ``enable_thinking=False`` evita los bloques ``<think>`` que Qwen3 emite por
     defecto y que ensuciarian las cuatro secciones de salida.
     """
     payload = {
         "messages": messages,
-        "stream": False,
+        "stream": True,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "chat_template_kwargs": {"enable_thinking": False},
     }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base_url}/v1/chat/completions",
+        data=data,
+        headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+        method="POST",
+    )
+
+    partes: list[str] = []
     try:
-        obj = _http_json(f"{base_url}/v1/chat/completions", payload, timeout=timeout)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            for linea in resp:
+                if cancel is not None and cancel.is_cancelled():
+                    # Salir del ``with`` cierra la conexion, y el llama-server deja
+                    # de generar al perder al cliente.
+                    raise Cancelled("La explicacion fue cancelada por el usuario.")
+                trozo = sse_delta(linea)
+                if trozo is None:
+                    continue
+                partes.append(trozo)
+                if on_token is not None:
+                    on_token(trozo)
+    except Cancelled:
+        raise
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise ProviderError(f"Fallo la llamada al modelo local: {exc}") from exc
-    try:
-        return obj["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise ProviderError("Respuesta inesperada del llama-server.") from exc
+
+    if not partes:
+        raise ProviderError("El llama-server no devolvio texto.")
+    return "".join(partes)
 
 
 class LlamaServer:
