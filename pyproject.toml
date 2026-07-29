@@ -25,9 +25,18 @@ pdf = ["PyMuPDF>=1.24"]
 # rasterization via pdf2image. Needs the Tesseract and Poppler system binaries
 # installed separately; these are only the Python bindings.
 ocr = ["pytesseract>=0.3.13", "pdf2image>=1.17", "pillow>=11"]
+# Desktop GUI (ADR 0002) plus the embedded terminal backend (ADR 0004). Kept out
+# of the base install so a headless CLI or server use stays as light as it is
+# today: PySide6 alone is a few hundred MB of Qt. `pywinpty` is Windows-only and
+# the terminal panel degrades to a clear message everywhere else.
+gui = ["PySide6>=6.7", "pywinpty>=2.0; sys_platform == 'win32'"]
 
 [project.scripts]
 leyllana = "leyllana.cli:main"
+# Deliberately a console script and not a `gui-scripts` entry: a windowless
+# launcher would swallow tracebacks, and until the Phase-4 installer exists the
+# console is where a failed model load or a missing binary becomes visible.
+leyllana-gui = "leyllana.gui:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
