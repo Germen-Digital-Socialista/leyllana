@@ -163,6 +163,127 @@ Installed as the `gui` extra (`uv sync --extra gui`), run with `leyllana-gui` or
   low-RAM model, and a richer GPU auto-detect than the `nvidia-smi` probe.
 - Shaped by: ADR 0002, 0004, 0007, 0013, 0018, 0019, 0020, 0021, 0022.
 
+## Agreed but not yet built — open queue as of 2026-07-29
+**Status: In Progress**
+
+Recorded here rather than left in a conversation. Each of these was asked for and
+agreed; none is built. Ordered roughly by dependency.
+
+1. **Export to PDF and Word, keeping Markdown.** Agreed: PDF is what you send, Word
+   is what someone edits. Qt writes PDF natively (`QPdfWriter`); `.docx` needs
+   `python-docx`. Changes PRD FR-8 ("Save the explanation as Markdown"), so it
+   needs its own ADR. The existing GUI/CLI byte-parity test must keep passing on
+   the Markdown path.
+2. **Per-`nivel` output templates.** The `nivel` fix (ADR 0023) moved the register
+   into the prompt, but a prompt only asks. Consistency should be enforced by a
+   render template per level rather than by the model's cooperation — which is
+   exactly what failed before. Design not settled: a per-level Markdown render
+   template is inside ADR 0007; extending the output contract with extra fields
+   for `tecnico` supersedes it. **Needs a decision before code.**
+3. **Live token indicator for the local model.** Show that generation is actually
+   moving, not hung. The seam already exists: `on_token` in
+   `chat_completion` (ADR 0020) is called per SSE frame and is currently unused by
+   the GUI. Wire it to a token counter and rate in the Estado box.
+4. **Slow-run escalation.** After ~10 minutes still running, offer to keep waiting
+   or to switch to a smaller model. **Blocked on a real conflict:** the smaller
+   model we ship (Qwen3-1.7B) is the one Phase 1 measured emitting complete
+   fiction on a long norm, twice, exiting 0. Offering that switch would deliver
+   invention faster, against the project's central promise. Either the fallback is
+   replaced with something tested first (see the model findings below), or the
+   offer is limited to wait/cancel until then.
+5. **Preview the loaded document before running.** The Archivo tab shows only a
+   path, so the user cannot tell whether extraction actually worked — which
+   matters most exactly when it silently did not, i.e. a scanned PDF that went
+   through OCR (FR-1.1). Show the first extracted characters so the input can be
+   eyeballed before a 30-minute run starts.
+6. **Raise `ctx` and re-measure** before considering any model swap. See below.
+
+## Local model options — research findings, 2026-07-29
+**Status: recorded, nothing decided**
+
+Written down because these findings kept getting lost across a long session. None
+of this changes ADR 0015 yet; **no model has been swapped, and nothing here is
+adopted.** Any change needs its own ADR and a faithfulness test on a real norm.
+
+### Measured on this machine, not estimated
+
+| | GPU (RTX-class desktop) | CPU-only, same desktop |
+|---|---|---|
+| One map fragment, Qwen3-4B Q4_K_M | — | **138 s** (~7.4 tok/s) |
+| ~105k chars at `ctx = 4096` → 13 fragments | ~2 min | **~32 min** (extrapolated from 2 measured calls) |
+
+Cold start on CPU adds ~3 s over a warm call, so the cost is almost entirely
+generation, and it is roughly linear in `fragmentos × max_tokens`. **A laptop
+without a GPU is the real target and is slower than the 32 minutes above.**
+
+### The cheapest lever is our own config, not a new model
+
+`ctx = 4096` in `leyllana.toml` is what splits a 99k-character law into 13
+sequential passes. Qwen3-4B supports far more. Fewer fragments means less time
+*and* fewer map-reduce artefacts — the lost article identifier recorded in Phase 1
+was a reduction artefact. **Untested: raise `ctx` and re-measure before touching
+models.** On CPU this trades many short passes for one long prompt-processing
+pass, so it is not automatically a win and has to be measured.
+
+### Latin-America-centric candidates
+
+- **Latam-GPT** — CENIA (Chile), launched Feb 2026, 15 countries and 60+
+  institutions, ~8 TB Spanish/Portuguese, Llama 3.1 architecture so llama.cpp
+  compatible, built for about USD 550.000. The obvious fit for this project's
+  politics. **Not verified: whether weights or a GGUF are actually published**, or
+  at what parameter count. That check is step one.
+- **Salamandra** (BSC-LT, Barcelona) — 2B / 7B / 40B, Apache 2.0, **official GGUF
+  published by BSC-LT**. Reported best QA accuracy across all languages in one
+  comparative study of Iberian-language tasks. Spain-centric, not Chilean.
+- **ALIA-es-legal-7B-Instruct** (SINAI) — Salamandra-7B continued-pretrained on
+  Spain's BOE and Congreso, then instruction-tuned. The only candidate trained on
+  this register; its instincts are Spanish, not Chilean.
+- **MEL** (UPM) — legal-Spanish model built on XLM-RoBERTa. Encoder-only, so it
+  cannot produce our four sections. Ruled out for this task.
+
+### Small / low-RAM candidates
+
+The slot matters because Phase 1 measured the shipped fallback (Qwen3-1.7B)
+producing **confident fiction** on a long norm, twice, exiting 0 both times.
+
+- **LFM2 / LFM2.5-1.2B-Instruct** (Liquid AI) — official GGUF, built for
+  on-device, reported higher CPU throughput than Gemma-3-4B, Granite Micro,
+  SmolLM3-3B and Llama-3.2-3B. Spanish is a supported language, but the
+  pre-training mix is ~75% English.
+- **Gemma 3 1B / 4B** — official `ggml-org` GGUF, 140+ languages, **32k context on
+  the 1B and 128k on the others**. The long context is the interesting part here,
+  not the speed.
+- **Phi-4 Mini 3.8B** (~12 tok/s on a modern i7, CPU-only) and **Llama 3.2 3B**
+  (25-45 tok/s on an 8-core laptop CPU) as reference points.
+
+### How to choose instead of guessing
+
+- **La Leaderboard** (BSC + UPM + HuggingFace) — 66 datasets over Spanish
+  varieties **including Chilean**, 50 models scored, Apache 2.0.
+- **BOE-XSUM** — 3.648 extreme summaries in clear language of Spanish official
+  decrees. The closest published analogue to what leyllana does, usable as an eval
+  set despite being Spain's BOE.
+
+### What a Chilean technical reading contains (fed ADR 0023)
+
+Research behind the `nivel` rework. BCN already publishes both of our registers:
+**Ley Fácil** (since 2003, OECD-cited, RAE calls it pioneering in Hispanoamérica)
+targets *requisitos para acceder a un beneficio, conductas tipificadas y sus
+penas, obligaciones a las que se está sujeto*. **Asesoría Técnica Parlamentaria**
+exists to *"reducir la asimetría de información con el Poder Ejecutivo"* and
+leans on the *cuadro comparativo* (vigente vs. propuesto) plus *observaciones
+sobre técnica legislativa*.
+
+Elements a technical reading surfaces, all verified: tipo de ley y quórum (LOC
+4/7, calificado, simple); ámbito de aplicación y definiciones (usually Artículo
+1°); sujetos obligados and from when they are bound (Ley 21.663's OIV only on an
+*ejecutoriada* calificación); plazos in días hábiles per Ley 19.880 (cómputo from
+the following day, prórroga to the next business day); multas in UTM by tier;
+the fiscalising organ and its facultades; reclamación de ilegalidad and its
+plazo; remisión normativa to a reglamento de ejecución; entrada en vigencia and
+disposiciones transitorias (Código Civil arts. 6-7); and what the norm modifica,
+sustituye, intercala or deroga, referenced against the base text.
+
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
 
