@@ -3,6 +3,14 @@
 Phase-based, not calendar-dated. Status values: **Not Started** / **In Progress**
 / **Blocked** / **Done**. Each phase links the ADRs that shaped it.
 
+## Contributors
+
+- **Felipe Carvajal Brown** — sole author and developer. Every decision recorded in
+  `docs/adr/` is his; he is the `Deciders:` line on all of them.
+
+Add a line per person as the list grows, naming what they actually did rather than
+a generic role.
+
 ---
 
 ## Phase 0 — Foundation and decisions
