@@ -69,6 +69,11 @@ class MainWindow(QMainWindow):
         divisor.addWidget(self.result_panel)
         divisor.setStretchFactor(0, 2)
         divisor.setStretchFactor(1, 3)
+        divisor.setChildrenCollapsible(False)
+        divisor.setHandleWidth(8)
+        # El panel de fuente no necesita crecer; el de resultado si, porque ahi va
+        # el texto que se lee. Arrancar al 40/60 y no a la mitad.
+        divisor.setSizes([460, 700])
         self.setCentralWidget(divisor)
 
         self.terminal = TerminalPanel()
@@ -77,6 +82,12 @@ class MainWindow(QMainWindow):
         self._dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._dock)
         self._dock.hide()
+        # Un tercio de la ventana es demasiado para un panel auxiliar: la
+        # explicacion es lo que se lee. Alto suficiente para ver una invocacion
+        # completa y su respuesta, y el usuario lo agranda si quiere.
+        self.resizeDocks(
+            [self._dock], [190], Qt.Orientation.Vertical
+        )
 
         self.traza.connect(self.terminal.registrar)
         self._session.set_trace(self.traza.emit)
@@ -176,7 +187,12 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------- apariencia
 
     def _aplicar_gui_config(self) -> None:
-        self.result_panel.aplicar_cuerpo(self._session.config.gui.font_size)
+        gui = self._session.config.gui
+        app = QApplication.instance()
+        oscuro = theme.sistema_es_oscuro(app) if app is not None else False
+        self.result_panel.aplicar_estilo(
+            gui.font_size, theme.resolver(gui.theme, oscuro)
+        )
 
     def _cambiar_cuerpo(self, delta: int) -> None:
         gui = self._session.config.gui
@@ -184,7 +200,7 @@ class MainWindow(QMainWindow):
         if nuevo == gui.font_size:
             return
         self._session.update_gui(replace(gui, font_size=nuevo))
-        self.result_panel.aplicar_cuerpo(nuevo)
+        self._aplicar_gui_config()
         try:
             self._session.save()
         except OSError as exc:

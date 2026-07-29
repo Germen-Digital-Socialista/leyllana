@@ -12,6 +12,7 @@ Cancelar.
 from __future__ import annotations
 
 from PySide6.QtCore import QElapsedTimer, Qt, QTimer, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -60,6 +61,8 @@ class SourcePanel(QWidget):
 
     def _armar(self) -> None:
         raiz = QVBoxLayout(self)
+        raiz.setContentsMargins(12, 12, 6, 12)
+        raiz.setSpacing(14)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._pestana_archivo(), "Archivo")
@@ -68,6 +71,8 @@ class SourcePanel(QWidget):
         raiz.addWidget(self.tabs, 1)
 
         opciones = QFormLayout()
+        opciones.setContentsMargins(0, 0, 0, 0)
+        opciones.setHorizontalSpacing(10)
         self.nivel = QComboBox()
         for etiqueta, valor in _NIVELES:
             self.nivel.addItem(etiqueta, valor)
@@ -78,14 +83,22 @@ class SourcePanel(QWidget):
         raiz.addLayout(opciones)
 
         botones = QHBoxLayout()
+        botones.setSpacing(8)
         self.boton_explicar = QPushButton("Explicar")
         self.boton_explicar.setDefault(True)
+        # Explicar es la unica accion que importa en este panel; Cancelar solo
+        # existe mientras hay algo que cancelar, asi que no compiten en peso.
+        self.boton_explicar.setMinimumHeight(38)
+        fuerte = QFont(self.boton_explicar.font())
+        fuerte.setBold(True)
+        self.boton_explicar.setFont(fuerte)
         self.boton_explicar.clicked.connect(self.explicar)
         self.boton_cancelar = QPushButton("Cancelar")
         self.boton_cancelar.setEnabled(False)
+        self.boton_cancelar.setMinimumHeight(38)
         self.boton_cancelar.clicked.connect(self.cancelar)
-        botones.addWidget(self.boton_explicar)
-        botones.addWidget(self.boton_cancelar)
+        botones.addWidget(self.boton_explicar, 2)
+        botones.addWidget(self.boton_cancelar, 1)
         raiz.addLayout(botones)
 
         raiz.addWidget(self._caja_estado())
@@ -134,16 +147,22 @@ class SourcePanel(QWidget):
     def _caja_estado(self) -> QGroupBox:
         caja = QGroupBox("Estado")
         v = QVBoxLayout(caja)
+        v.setSpacing(8)
         self.barra = QProgressBar()
         self.barra.setTextVisible(False)
         self.barra.setRange(0, 1)
         self.barra.setValue(0)
+        self.barra.setFixedHeight(6)  # una linea, no un bloque: es un dato, no el tema
         v.addWidget(self.barra)
         fila = QHBoxLayout()
         self.etiqueta_estado = QLabel("Listo.")
         self.etiqueta_estado.setWordWrap(True)
         self.etiqueta_tiempo = QLabel("")
         self.etiqueta_tiempo.setAlignment(Qt.AlignmentFlag.AlignRight)
+        # El cronometro en monoespaciada para que no baile al cambiar de digito.
+        reloj = QFont("Consolas")
+        reloj.setStyleHint(QFont.StyleHint.Monospace)
+        self.etiqueta_tiempo.setFont(reloj)
         fila.addWidget(self.etiqueta_estado, 1)
         fila.addWidget(self.etiqueta_tiempo)
         v.addLayout(fila)

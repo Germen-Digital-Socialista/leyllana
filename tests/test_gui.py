@@ -374,3 +374,82 @@ def test_cambiar_el_sumidero_suelta_el_proveedor_viejo(monkeypatch):
     assert sesion.provider is not None
     sesion.set_trace(lambda ev: None)
     assert fake.cerrado
+
+
+# --------------------------------------------- jerarquia tipografica del resultado
+
+
+def _tamanos(panel):
+    """Devuelve (encabezados, cuerpo, fuente) en puntos, leidos del documento."""
+    doc = panel.vista.document()
+    encabezados, cuerpo, ficha = [], [], []
+    bloque = doc.begin()
+    while bloque.isValid():
+        it = bloque.begin()
+        if not it.atEnd() and it.fragment().isValid():
+            puntos = it.fragment().charFormat().fontPointSize()
+            if bloque.blockFormat().headingLevel():
+                encabezados.append(puntos)
+            elif bloque.textList() is not None:
+                ficha.append(puntos)
+            elif bloque.text().strip():
+                cuerpo.append(puntos)
+        bloque = bloque.next()
+    return encabezados, cuerpo, ficha
+
+
+def test_los_titulos_pesan_mas_que_el_texto_y_la_ficha_menos(app):
+    # Sin esto, un retoque de tamanos aplana la jerarquia sin que nada avise, y el
+    # bloque de procedencia vuelve a comerse la primera pantalla.
+    panel = ResultPanel()
+    panel.aplicar_estilo(14, theme.CLARO)
+    panel.mostrar(
+        _explicacion(), SourceInfo(titulo="Ley 21.663", url="https://ejemplo.cl")
+    )
+    encabezados, cuerpo, ficha = _tamanos(panel)
+
+    assert encabezados and cuerpo and ficha
+    assert min(encabezados) > max(cuerpo)
+    assert max(ficha) < min(cuerpo)
+
+
+def test_el_cuerpo_sigue_al_tamano_configurado(app):
+    panel = ResultPanel()
+    panel.mostrar(_explicacion(), SourceInfo())
+    for puntos in (10, 22):
+        panel.aplicar_estilo(puntos, theme.CLARO)
+        _, cuerpo, _ = _tamanos(panel)
+        assert cuerpo and all(p == puntos for p in cuerpo)
+
+
+def test_el_enlace_de_la_fuente_no_se_apaga(app):
+    # La URL existe para poder ir a comprobar la norma: si queda del mismo gris
+    # que el resto de la ficha, deja de verse como enlace.
+    panel = ResultPanel()
+    panel.aplicar_estilo(14, theme.CLARO)
+    panel.mostrar(_explicacion(), SourceInfo(url="https://ejemplo.cl"))
+
+    doc, colores = panel.vista.document(), {}
+    bloque = doc.begin()
+    while bloque.isValid():
+        it = bloque.begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            if frag.isValid() and bloque.textList() is not None:
+                clave = "enlace" if frag.charFormat().isAnchor() else "texto"
+                colores.setdefault(clave, frag.charFormat().foreground().color().name())
+            it += 1
+        bloque = bloque.next()
+
+    assert colores["enlace"] != colores["texto"]
+    assert colores["enlace"].lower() == theme.color(theme.CLARO, "highlight").lower()
+
+
+def test_exportar_no_se_ve_afectado_por_el_estilo(app):
+    # El formato es solo de pantalla: lo que se exporta sigue siendo lo que
+    # imprime la CLI, carácter por carácter.
+    info = SourceInfo(titulo="Ley 21.663", url="https://ejemplo.cl")
+    panel = ResultPanel()
+    panel.mostrar(_explicacion(), info)
+    panel.aplicar_estilo(28, theme.OSCURO)
+    assert panel._markdown == componer(_explicacion(), info)
