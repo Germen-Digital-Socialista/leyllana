@@ -1,0 +1,44 @@
+<svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="leyllana - la ley en lenguaje llano">
+  <title>leyllana - la ley en lenguaje llano</title>
+
+  <!-- El germen (brote con venas de circuito) es la marca de Germen Digital
+       Socialista y se mantiene tal cual, corrido hacia arriba: es lo que unifica
+       a las herramientas de la organizacion. El libro abierto delante es lo
+       propio de leyllana. -->
+
+  <!-- tallo: sale de entre las paginas -->
+  <path d="M110 178 C110 150 110 120 110 76" stroke="#c1121f" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- hoja izquierda, con venas de circuito -->
+  <path d="M110 108 C86 108 60 98 50 72 C78 68 104 80 110 108 Z" fill="#d62828"/>
+  <path d="M110 108 C92 100 74 88 58 76" stroke="#ffe0e0" stroke-width="2.4" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="58" cy="76" r="4.2" fill="#ffe0e0"/>
+  <circle cx="80" cy="92" r="3" fill="#ffe0e0"/>
+
+  <!-- hoja derecha -->
+  <path d="M110 96 C134 92 162 78 172 50 C142 48 116 64 110 96 Z" fill="#c1121f"/>
+  <path d="M110 96 C130 84 150 70 168 54" stroke="#ffe0e0" stroke-width="2.4" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="168" cy="54" r="4.2" fill="#ffe0e0"/>
+  <circle cx="146" cy="70" r="3" fill="#ffe0e0"/>
+
+  <!-- nodo superior: la chispa digital del germen -->
+  <circle cx="110" cy="68" r="9" fill="#c1121f"/>
+  <circle cx="110" cy="68" r="3.6" fill="#ffe0e0"/>
+
+  <!-- ticks de datos ascendentes por el tallo -->
+  <path d="M110 130 H126" stroke="#d62828" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="130" cy="130" r="2.6" fill="#d62828"/>
+  <path d="M110 118 H92" stroke="#d62828" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="88" cy="118" r="2.6" fill="#d62828"/>
+
+  <!-- libro abierto, DELANTE del brote (se dibuja al final) -->
+  <path d="M110 176 C92 164 62 157 34 160 L34 190 C62 187 92 194 110 204 Z" fill="#ffe0e0" stroke="#7a1518" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M110 176 C128 164 158 157 186 160 L186 190 C158 187 128 194 110 204 Z" fill="#ffe0e0" stroke="#7a1518" stroke-width="6" stroke-linejoin="round"/>
+  <!-- lomo -->
+  <path d="M110 176 V204" stroke="#7a1518" stroke-width="6" stroke-linecap="round"/>
+  <!-- dos renglones por pagina: que se lea como texto, no como una hoja en blanco -->
+  <path d="M52 170 C68 171 84 175 96 180" stroke="#7a1518" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+  <path d="M52 180 C68 181 84 185 96 190" stroke="#7a1518" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+  <path d="M168 170 C152 171 136 175 124 180" stroke="#7a1518" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+  <path d="M168 180 C152 181 136 185 124 190" stroke="#7a1518" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+</svg>

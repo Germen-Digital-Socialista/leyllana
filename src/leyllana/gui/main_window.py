@@ -13,8 +13,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QSize, Qt, QThread, Signal
+from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 from ..config import Config
 from ..engine.trace import TraceEvent
 from ..types import Explanation, SourceInfo
-from . import theme
+from . import assets, theme
 from .consent_dialog import pedir_consentimiento
 from .errors import mensaje
 from .result_panel import ResultPanel
@@ -175,14 +175,22 @@ class MainWindow(QMainWindow):
         self._etiqueta_motor.setText(texto)
 
     def _acerca_de(self) -> None:
-        QMessageBox.about(
-            self,
-            "Acerca de leyllana",
-            "leyllana explica leyes y boletines chilenos en lenguaje llano.\n\n"
-            "Primera herramienta de Germen Digital Socialista. Local por "
-            "defecto: nada sale de su equipo salvo que usted lo autorice.\n\n"
-            "No es asesoria legal ni una interpretacion oficial.",
+        caja = QMessageBox(self)
+        caja.setWindowTitle("Acerca de leyllana")
+        caja.setText(
+            "<b>leyllana</b><br>La ley, en lenguaje llano."
         )
+        caja.setInformativeText(
+            "Explica leyes y boletines chilenos en lenguaje llano.\n\n"
+            "Primera herramienta de Germen Digital Socialista. El brote es la "
+            "marca de la organizacion; el libro es esta herramienta. Local por "
+            "defecto: nada sale de su equipo salvo que usted lo autorice.\n\n"
+            "No es asesoria legal ni una interpretacion oficial."
+        )
+        logo = assets.ruta(assets.LOGO)
+        if logo is not None:
+            caja.setIconPixmap(QIcon(str(logo)).pixmap(QSize(96, 96)))
+        caja.exec()
 
     # ------------------------------------------------------------- apariencia
 

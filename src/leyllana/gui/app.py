@@ -10,11 +10,12 @@ from __future__ import annotations
 import argparse
 import sys
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .. import __version__
 from ..config import load, resolve_path
-from . import theme
+from . import assets, theme
 from .main_window import MainWindow
 from .session import Session
 
@@ -48,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     app = QApplication(sys.argv[:1])
     app.setApplicationName("leyllana")
     app.setApplicationDisplayName("leyllana")
+    icono = assets.ruta(assets.ICONO)
+    if icono is not None:
+        app.setWindowIcon(QIcon(str(icono)))
     theme.aplicar(app, config.gui.theme)
 
     ventana = MainWindow(Session(config, ruta))

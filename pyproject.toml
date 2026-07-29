@@ -48,6 +48,13 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/leyllana"]
 
+# Los SVG de marca viven en `assets/` (su lugar canonico, fuera del paquete) y se
+# copian dentro de la rueda para que la ventana tenga su icono cuando leyllana
+# esta instalada y no hay repo alrededor. Una sola fuente, dos destinos.
+[tool.hatch.build.targets.wheel.force-include]
+"assets/icon-leyllana.svg" = "leyllana/gui/assets/icon-leyllana.svg"
+"assets/logo-leyllana.svg" = "leyllana/gui/assets/logo-leyllana.svg"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"

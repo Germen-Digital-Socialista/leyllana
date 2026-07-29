@@ -453,3 +453,42 @@ def test_exportar_no_se_ve_afectado_por_el_estilo(app):
     panel.mostrar(_explicacion(), info)
     panel.aplicar_estilo(28, theme.OSCURO)
     assert panel._markdown == componer(_explicacion(), info)
+
+
+# ------------------------------------------------------------------ marca
+
+
+def test_los_archivos_de_marca_se_encuentran():
+    from leyllana.gui import assets
+
+    assert assets.ruta(assets.ICONO) is not None
+    assert assets.ruta(assets.LOGO) is not None
+
+
+def test_un_archivo_de_marca_ausente_no_revienta():
+    # Faltar un adorno no puede impedir que la ventana abra.
+    from leyllana.gui import assets
+
+    assert assets.ruta("no-existe-esto.svg") is None
+
+
+def test_el_icono_se_lee_y_no_queda_en_blanco_a_16px(app):
+    # El icono tiene que sobrevivir la escala de favicon: si a 16x16 sale vacio,
+    # no sirve de icono.
+    from PySide6.QtCore import QSize
+    from PySide6.QtGui import QIcon
+
+    from leyllana.gui import assets
+
+    icono = QIcon(str(assets.ruta(assets.ICONO)))
+    assert not icono.isNull()
+    imagen = icono.pixmap(QSize(16, 16)).toImage()
+    assert not imagen.isNull()
+    opacos = sum(
+        1
+        for y in range(imagen.height())
+        for x in range(imagen.width())
+        if imagen.pixelColor(x, y).alpha() > 0
+    )
+    # Al menos un cuarto del cuadro pintado: una silueta, no cuatro pixeles.
+    assert opacos > (16 * 16) // 4
