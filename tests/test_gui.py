@@ -232,7 +232,7 @@ class _FakeProvider:
 
 def _sesion_con(fake, monkeypatch, config=None):
     monkeypatch.setattr(
-        "leyllana.gui.session.get_provider", lambda cfg: fake
+        "leyllana.gui.session.get_provider", lambda cfg, trace=None: fake
     )
     return Session(config or Config())
 
@@ -240,7 +240,7 @@ def _sesion_con(fake, monkeypatch, config=None):
 def test_el_proveedor_se_construye_una_sola_vez(monkeypatch):
     creados = []
 
-    def crear(cfg):
+    def crear(cfg, trace=None):
         creados.append(cfg)
         return _FakeProvider()
 

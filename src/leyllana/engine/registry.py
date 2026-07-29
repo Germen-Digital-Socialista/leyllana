@@ -11,19 +11,25 @@ from ..config import Config
 from .base import Provider
 from .cli_provider import CliProvider
 from .local import LocalProvider
+from .trace import TraceFn
 
 # Proveedores de nube por API key (ADR 0004), aun no cableados. El camino de nube
 # disponible hoy es por suscripcion via ``cli`` (ADR 0018).
 _API_PROVIDERS = frozenset({"claude", "openai", "codex", "gemini"})
 
 
-def get_provider(config: Config) -> Provider:
-    """Devuelve el proveedor indicado por ``config.engine.provider``."""
+def get_provider(config: Config, trace: TraceFn | None = None) -> Provider:
+    """Devuelve el proveedor indicado por ``config.engine.provider``.
+
+    ``trace`` es opcional y solo lo usa el camino de nube (ADR 0022): recibe lo
+    que se invoco y cuanto texto salio del equipo, para que la GUI pueda
+    mostrarlo. Omitirlo deja el comportamiento de siempre.
+    """
     name = config.engine.provider.lower()
     if name == "local":
         return LocalProvider(config)
     if name == "cli":
-        return CliProvider(config)
+        return CliProvider(config, trace)
     if name in _API_PROVIDERS:
         raise NotImplementedError(
             f"Proveedor por API key {name!r} (opt-in, ADR 0004): aun no implementado. "

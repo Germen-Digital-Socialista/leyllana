@@ -18,14 +18,21 @@ from pathlib import Path
 from ..config import Config, GuiConfig, save
 from ..engine.base import Provider
 from ..engine.registry import get_provider
+from ..engine.trace import TraceFn
 
 
 class Session:
     """Config vigente y proveedor asociado, compartidos por toda la ventana."""
 
-    def __init__(self, config: Config, config_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        config: Config,
+        config_path: str | Path | None = None,
+        trace: TraceFn | None = None,
+    ) -> None:
         self._config = config
         self._config_path = config_path
+        self._trace = trace
         self._provider: Provider | None = None
 
     @property
@@ -46,7 +53,7 @@ class Session:
         conserva de una corrida a la siguiente.
         """
         if self._provider is None:
-            self._provider = get_provider(self._config)
+            self._provider = get_provider(self._config, self._trace)
         return self._provider
 
     @property

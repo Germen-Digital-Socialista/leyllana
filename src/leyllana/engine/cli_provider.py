@@ -23,6 +23,7 @@ from ..config import Config
 from ..prompt import Prompt
 from .base import ProviderError
 from .progress import Cancelled, CancelToken
+from .trace import Kind, TraceFn, emit
 
 # Argv verificado de cada CLI probado. ``{system_file}`` marca donde va la ruta
 # al archivo con el system prompt; el CLI que no tenga ese flag lo recibe al
@@ -69,8 +70,9 @@ class CliProvider:
 
     sends_to_cloud = True
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, trace: TraceFn | None = None) -> None:
         self._cfg = config.engine.cli
+        self._trace = trace
 
     @property
     def ctx_tokens(self) -> int:
@@ -122,6 +124,15 @@ class CliProvider:
             # deje ``model`` vacio y pongalo directamente en ``command``.
             if self._cfg.model:
                 argv += ["--model", self._cfg.model]
+            # Se avisa ANTES de arrancar (ADR 0022): si el CLI se cuelga o lo
+            # cancelan, el usuario ya alcanzo a ver que se iba a ejecutar.
+            emit(self._trace, Kind.INVOCACION, subprocess.list2cmdline(argv))
+            emit(
+                self._trace,
+                Kind.ENVIO,
+                f"{len(entrada):,} caracteres por stdin".replace(",", "."),
+            )
+            comenzado = time.monotonic()
             try:
                 proc = subprocess.Popen(  # noqa: S603 (argv de la config, sin shell)
                     argv,
@@ -140,12 +151,20 @@ class CliProvider:
                 ) from exc
             salida_std, salida_err = self._comunicar(proc, entrada, argv[0], cancel)
 
+        fin = f"codigo {proc.returncode} en {time.monotonic() - comenzado:.1f}s"
+        salida = (salida_std or "").strip()
+        # El fin se avisa pase lo que pase, tambien cuando la corrida fracasa: un
+        # envio que salio y volvio con error igual salio, y ocultarlo seria
+        # justamente lo que ADR 0022 viene a arreglar.
+        if proc.returncode != 0 or not salida:
+            emit(self._trace, Kind.FIN, fin)
         if proc.returncode != 0:
             cola = (salida_err or "").strip()[-_STDERR_TAIL:]
             raise ProviderError(f"El CLI termino con codigo {proc.returncode}: {cola}")
-        salida = (salida_std or "").strip()
         if not salida:
             raise ProviderError("El CLI no devolvio texto.")
+        emit(self._trace, Kind.RESPUESTA, salida)
+        emit(self._trace, Kind.FIN, fin)
         return salida
 
     def _comunicar(

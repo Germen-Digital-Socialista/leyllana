@@ -14,6 +14,7 @@ from leyllana.engine import ConsentRequired, explain
 from leyllana.engine.base import ProviderError
 from leyllana.engine.cli_provider import CliProvider
 from leyllana.engine.progress import Cancelled, CancelToken
+from leyllana.engine.trace import Kind
 from leyllana.prompt import Prompt
 from leyllana.types import Nivel
 
@@ -214,3 +215,73 @@ def test_el_contexto_del_cli_manda_sobre_el_del_modelo_local(corrida):
     largo = "Articulo 1. " + ("palabra " * 4000)
     explain(largo, Nivel.PUBLICO, _config(preset="claude"), consent=True)
     assert corrida.llamadas == 1  # una sola pasada, sin map-reduce
+
+
+# --------------------------------------------- traza de lo que sale (ADR 0022)
+
+
+def _traza(monkeypatch, espia=None, **cli):
+    """Corre el proveedor con un sumidero de traza y devuelve los eventos."""
+    _patch(monkeypatch, espia or _Corrida())
+    eventos = []
+    CliProvider(_config(**(cli or {"preset": "claude"})), eventos.append).generate(
+        PROMPT
+    )
+    return eventos
+
+
+def test_la_traza_dice_que_se_invoco_y_cuanto_salio(monkeypatch):
+    eventos = _traza(monkeypatch)
+    clases = [e.kind for e in eventos]
+    assert clases == [Kind.INVOCACION, Kind.ENVIO, Kind.RESPUESTA, Kind.FIN]
+
+    invocacion = eventos[0].detalle
+    assert "claude" in invocacion
+    assert "--system-prompt-file" in invocacion
+    assert str(len(PROMPT.user)) in eventos[1].detalle
+    assert eventos[2].detalle == CUATRO_SECCIONES.strip()
+    assert eventos[3].detalle.startswith("codigo 0 en")
+
+
+def test_la_traza_no_lleva_el_texto_del_documento(monkeypatch):
+    # Se informa el tamano, no el contenido: un volcado de 99.468 caracteres en un
+    # panel que se desplaza es ruido, no transparencia (ADR 0022).
+    eventos = _traza(monkeypatch)
+    assert not any(PROMPT.user in e.detalle for e in eventos)
+
+
+def test_se_avisa_antes_de_arrancar_el_cli(monkeypatch):
+    # Si el CLI se cuelga o lo cancelan, el usuario ya vio que se iba a ejecutar.
+    espia = _patch(monkeypatch, _Corrida(cuelga=True))
+    eventos = []
+    with pytest.raises(ProviderError):
+        CliProvider(
+            _config(preset="claude", timeout=0), eventos.append
+        ).generate(PROMPT)
+    assert [e.kind for e in eventos][:2] == [Kind.INVOCACION, Kind.ENVIO]
+    assert espia.matado
+
+
+def test_un_envio_fallido_tambien_queda_en_la_traza(monkeypatch):
+    # Un envio que salio y volvio con error igual salio; ocultarlo seria justo lo
+    # que ADR 0022 viene a arreglar.
+    _patch(monkeypatch, _Corrida(stdout="", stderr="se cayo", returncode=1))
+    eventos = []
+    with pytest.raises(ProviderError):
+        CliProvider(_config(preset="claude"), eventos.append).generate(PROMPT)
+    assert Kind.INVOCACION in [e.kind for e in eventos]
+    assert [e for e in eventos if e.kind is Kind.FIN][0].detalle.startswith("codigo 1")
+    assert Kind.RESPUESTA not in [e.kind for e in eventos]
+
+
+def test_sin_sumidero_no_cambia_nada(corrida):
+    # El camino de la CLI headless no pasa traza y se comporta igual que siempre.
+    assert CliProvider(_config(preset="claude")).generate(PROMPT)
+
+
+def test_el_registro_solo_traza_el_camino_de_nube(monkeypatch):
+    # El proveedor local habla con 127.0.0.1: no hay nada que revelar (ADR 0022).
+    from leyllana.engine.registry import get_provider
+
+    local = get_provider(Config(), lambda ev: None)
+    assert not hasattr(local, "_trace")
