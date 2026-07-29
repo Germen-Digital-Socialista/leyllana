@@ -44,6 +44,17 @@ class Session:
         """Archivo del que salio la config, para poder nombrarlo en Ajustes."""
         return self._config_path
 
+    def set_trace(self, trace: TraceFn | None) -> None:
+        """Conecta el sumidero de la traza (ADR 0022).
+
+        Existe porque la ventana se construye despues de la sesion y es ella la
+        que tiene el panel donde mostrarla. Suelta el proveedor si ya estaba
+        armado, para que no quede uno viejo enviando sin dejar rastro.
+        """
+        if trace is not self._trace:
+            self.close()
+        self._trace = trace
+
     @property
     def provider(self) -> Provider:
         """Proveedor de la config actual, construido una sola vez.

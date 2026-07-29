@@ -11,19 +11,23 @@ paneles. La logica que se puede probar sin ventana no vive aqui.
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QDockWidget,
+    QLabel,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QSplitter,
 )
 
 from ..config import Config
+from ..engine.trace import TraceEvent
 from ..types import Explanation, SourceInfo
 from . import theme
 from .consent_dialog import pedir_consentimiento
@@ -40,6 +44,11 @@ TITULO = "leyllana"
 
 class MainWindow(QMainWindow):
     """Ventana principal de leyllana."""
+
+    # La traza la emite el proveedor desde el hilo de trabajo (ADR 0022). Pasa por
+    # una senal para que Qt la entregue en cola al hilo de la interfaz: el panel
+    # de terminal es un widget y no se toca desde otro hilo.
+    traza = Signal(TraceEvent)
 
     def __init__(self, session: Session) -> None:
         super().__init__()
@@ -69,11 +78,12 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._dock)
         self._dock.hide()
 
+        self.traza.connect(self.terminal.registrar)
+        self._session.set_trace(self.traza.emit)
+
         self._menus()
+        self._barra_estado()
         self._aplicar_gui_config()
-        self.statusBar().showMessage(
-            "Local por defecto: nada sale de su equipo hasta que usted lo autorice."
-        )
 
     # ------------------------------------------------------------------ menus
 
@@ -112,6 +122,46 @@ class MainWindow(QMainWindow):
         acerca = QAction("&Acerca de leyllana", self)
         acerca.triggered.connect(self._acerca_de)
         ayuda.addAction(acerca)
+
+    # ------------------------------------------------------------ barra de estado
+
+    def _barra_estado(self) -> None:
+        """Motor vigente a la izquierda, interruptor del terminal a la derecha.
+
+        El terminal estaba solo en el menu Ver, y ahi es donde no se encuentra. Ya
+        que es donde se ve lo que sale del equipo (ADR 0022), tiene que estar a un
+        clic de distancia.
+        """
+        barra = self.statusBar()
+        self._etiqueta_motor = QLabel()
+        barra.addWidget(self._etiqueta_motor)
+
+        self._boton_terminal = QPushButton("Terminal")
+        self._boton_terminal.setCheckable(True)
+        self._boton_terminal.setFlat(True)
+        self._boton_terminal.setToolTip(
+            "Muestra el shell y, en una corrida de nube, el comando exacto que se "
+            "ejecuto y cuanto texto salio de su equipo."
+        )
+        self._boton_terminal.toggled.connect(self._dock.setVisible)
+        self._dock.visibilityChanged.connect(self._boton_terminal.setChecked)
+        barra.addPermanentWidget(self._boton_terminal)
+
+        self._describir_motor()
+
+    def _describir_motor(self) -> None:
+        """Escribe en la barra que motor esta configurado y si el envio sale."""
+        engine = self._session.config.engine
+        if engine.provider.lower() == "local":
+            ruta = engine.default_model.path
+            modelo = Path(ruta).name if ruta else "sin modelo configurado"
+            texto = f"Local: {modelo}. Nada sale de su equipo."
+        else:
+            destino = engine.cli.preset or next(iter(engine.cli.command), "CLI")
+            texto = (
+                f"Nube ({destino}): se le pedira autorizacion en cada explicacion."
+            )
+        self._etiqueta_motor.setText(texto)
 
     def _acerca_de(self) -> None:
         QMessageBox.about(
@@ -162,8 +212,10 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             QMessageBox.warning(self, "No se pudo guardar", f"Error: {exc}")
             return
+        self._session.set_trace(self.traza.emit)
         self._aplicar_tema(nueva)
         self._aplicar_gui_config()
+        self._describir_motor()
         self.statusBar().showMessage(f"Ajustes guardados en {ruta}.", 8000)
 
     def _aplicar_tema(self, config: Config) -> None:
@@ -188,9 +240,12 @@ class MainWindow(QMainWindow):
         try:
             if self._session.envia_a_la_nube:
                 if not pedir_consentimiento(self, self._session.destino):
-                    self.statusBar().showMessage("Envio cancelado.", 5000)
                     return
                 consent = True
+                # Si el documento va a salir, el panel que lo muestra se abre
+                # solo: una garantia que hay que ir a buscar al menu no sirve
+                # de garantia (ADR 0022).
+                self._dock.show()
         except Exception as exc:  # noqa: BLE001 - proveedor mal configurado
             QMessageBox.warning(self, "No se pudo preparar el motor", mensaje(exc))
             return

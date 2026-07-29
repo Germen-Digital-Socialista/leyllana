@@ -1,8 +1,17 @@
 """Panel de terminal empotrado (ADR 0004), sobre ``pywinpty`` en Windows.
 
-Sirve para manejar a mano el CLI de un proveedor al lado de la aplicacion:
-autenticarse, mirar cuota, probar un comando. La autenticacion la resuelve el
-propio CLI contra la suscripcion del usuario y leyllana no ve credenciales.
+Hace dos cosas.
+
+La primera es un shell de verdad al lado de la aplicacion, para manejar a mano el
+CLI de un proveedor: autenticarse, mirar cuota, probar un comando. La
+autenticacion la resuelve el propio CLI contra la suscripcion del usuario y
+leyllana no ve credenciales.
+
+La segunda es mostrar **lo que de verdad salio del equipo** (ADR 0022). Cuando
+una corrida usa el proveedor de nube, aqui aparece el comando exacto que se
+ejecuto, cuanto texto se mando y que respondio. leyllana promete que nada sale
+sin permiso; esto es lo que hace comprobable la promesa en vez de dejarla en
+nuestra palabra. El texto del documento no se imprime: su tamano si.
 
 **No es un emulador de terminal completo.** Interpreta lo justo para que una
 sesion normal se lea: se descartan las secuencias de escape ANSI en vez de
@@ -19,10 +28,14 @@ from __future__ import annotations
 import os
 import re
 import sys
+from html import escape
 
 from PySide6.QtCore import QEvent, QObject, Qt, QThread, Signal
 from PySide6.QtGui import QFont, QKeyEvent, QKeySequence, QTextCursor
-from PySide6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QPlainTextEdit, QVBoxLayout, QWidget
+
+from ..engine.trace import Kind, TraceEvent
+from . import theme
 
 # CSI, OSC y los escapes de un solo caracter. Se borran; no se interpretan.
 _ANSI = re.compile(
@@ -96,13 +109,12 @@ class TerminalPanel(QWidget):
         self.vista.installEventFilter(self)
         raiz.addWidget(self.vista)
 
+        # El motivo se escribe DENTRO de la vista en vez de reemplazarla por una
+        # etiqueta: sin shell el panel sigue sirviendo para lo otro que hace,
+        # mostrar lo que sale del equipo (ADR 0022).
         motivo = self._arrancar()
         if motivo is not None:
-            self.vista.hide()
-            aviso = QLabel(motivo)
-            aviso.setWordWrap(True)
-            aviso.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            raiz.addWidget(aviso)
+            self._nota(motivo)
 
     # --------------------------------------------------------------- arranque
 
@@ -139,6 +151,37 @@ class TerminalPanel(QWidget):
         self.vista.moveCursor(QTextCursor.MoveOperation.End)
         self.vista.insertPlainText(limpiar_ansi(texto))
         self.vista.moveCursor(QTextCursor.MoveOperation.End)
+
+    # ---------------------------------------------- lo que sale (ADR 0022)
+
+    def _color(self, clave: str) -> str:
+        app = QApplication.instance()
+        oscuro = theme.sistema_es_oscuro(app) if app is not None else False
+        return theme.color(theme.OSCURO if oscuro else theme.CLARO, clave)
+
+    def _nota(self, texto: str, clave: str = "dim") -> None:
+        """Escribe una linea de la aplicacion, distinguible de la del shell."""
+        self.vista.moveCursor(QTextCursor.MoveOperation.End)
+        self.vista.appendHtml(
+            f'<span style="color:{self._color(clave)}">'
+            f"{escape(texto).replace(chr(10), '<br>')}</span>"
+        )
+        self.vista.moveCursor(QTextCursor.MoveOperation.End)
+
+    def registrar(self, evento: TraceEvent) -> None:
+        """Muestra un aviso de lo que salio del equipo (ADR 0022).
+
+        El prefijo ``leyllana>`` marca lo que hizo la aplicacion, para que no se
+        confunda con lo que escribio el usuario en el shell.
+        """
+        if evento.kind is Kind.INVOCACION:
+            self._nota(f"\nleyllana> {evento.detalle}", "highlight")
+        elif evento.kind is Kind.ENVIO:
+            self._nota(f"          [sale del equipo: {evento.detalle}]")
+        elif evento.kind is Kind.RESPUESTA:
+            self._nota(evento.detalle, "text")
+        else:
+            self._nota(f"          [{evento.detalle}]")
 
     def eventFilter(self, obj, event):  # noqa: N802 - lo nombra Qt
         """Manda las teclas al shell en vez de dejarlas en la vista de solo lectura."""

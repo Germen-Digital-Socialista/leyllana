@@ -302,3 +302,75 @@ def test_cerrar_la_sesion_libera_el_modelo(monkeypatch):
 )
 def test_la_terminal_deja_texto_legible(crudo, limpio):
     assert limpiar_ansi(crudo) == limpio
+
+
+# --------------------------------- la traza en el panel de terminal (ADR 0022)
+
+
+def _eventos_de_una_corrida_de_nube():
+    from leyllana.engine.trace import Kind, TraceEvent
+
+    return [
+        TraceEvent(
+            Kind.INVOCACION, r"claude -p --system-prompt-file C:\tmp\system.txt"
+        ),
+        TraceEvent(Kind.ENVIO, "99.468 caracteres por stdin"),
+        TraceEvent(Kind.RESPUESTA, "Que hace: regula algo."),
+        TraceEvent(Kind.FIN, "codigo 0 en 41.2s"),
+    ]
+
+
+def test_el_panel_muestra_el_comando_y_el_tamano(app):
+    from leyllana.gui.terminal_panel import TerminalPanel
+
+    panel = TerminalPanel()
+    for ev in _eventos_de_una_corrida_de_nube():
+        panel.registrar(ev)
+    texto = panel.vista.toPlainText()
+
+    assert "claude -p --system-prompt-file" in texto
+    assert "99.468 caracteres" in texto
+    assert "sale del equipo" in texto
+    assert "codigo 0 en 41.2s" in texto
+    # Lo que hizo la app va marcado, para no confundirlo con lo que tecleo el usuario.
+    assert "leyllana>" in texto
+    panel.cerrar()
+
+
+def test_el_panel_sigue_sirviendo_sin_shell(app, monkeypatch):
+    # Sin pywinpty el panel no se cae ni se vacia: es donde se ve lo que sale.
+    import leyllana.gui.terminal_panel as tp
+
+    monkeypatch.setattr(tp.sys, "platform", "linux")
+    panel = tp.TerminalPanel()
+    assert panel.vista.isVisibleTo(panel)
+    assert "pywinpty" in panel.vista.toPlainText()
+
+    for ev in _eventos_de_una_corrida_de_nube():
+        panel.registrar(ev)
+    assert "99.468 caracteres" in panel.vista.toPlainText()
+    panel.cerrar()
+
+
+def test_la_sesion_pasa_el_sumidero_al_proveedor_de_nube(monkeypatch):
+    visto = {}
+
+    def crear(cfg, trace=None):
+        visto["trace"] = trace
+        return _FakeProvider()
+
+    monkeypatch.setattr("leyllana.gui.session.get_provider", crear)
+    sesion = Session(Config())
+    sumidero = lambda ev: None  # noqa: E731
+    sesion.set_trace(sumidero)
+    assert sesion.provider is not None
+    assert visto["trace"] is sumidero
+
+
+def test_cambiar_el_sumidero_suelta_el_proveedor_viejo(monkeypatch):
+    # Si no, quedaria uno enviando sin dejar rastro en el panel.
+    fake = _FakeProvider()
+    sesion = _sesion_con(fake, monkeypatch)
+    assert sesion.provider is not None
+    sesion.set_trace(lambda ev: None)
+    assert fake.cerrado
