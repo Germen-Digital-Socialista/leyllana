@@ -110,6 +110,9 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0016 | Local llama.cpp runtime: managed llama-server subprocess        | Accepted |
 | 0017 | Long-document handling: structure-aware map-reduce              | Accepted |
 | 0018 | Subscription cloud providers driven as a headless CLI subprocess | Accepted (complements 0004, 0013) |
+| 0019 | Progress and cancellation as an optional seam in `explain()`     | Accepted |
+| 0020 | Streaming local generation, so cancelling stops the work        | Accepted |
+| 0021 | The GUI reads and writes `leyllana.toml`                        | Accepted |
 
 ## Further reading
 
