@@ -198,13 +198,17 @@ agreed; none is built. Ordered roughly by dependency.
    fiction on a long norm, twice, exiting 0. Offering that switch would deliver
    invention faster, against the project's central promise. Either the fallback is
    replaced with something tested first (see the model findings below), or the
-   offer is limited to wait/cancel until then.
+   offer is limited to wait/cancel until then. **Do not design this before item 6
+   is measured.** If a higher `ctx` cuts the run enough, the ten-minute threshold
+   is never reached and the escalation is not needed at all — that measurement
+   can delete this item rather than inform it.
 5. **Preview the loaded document before running.** The Archivo tab shows only a
    path, so the user cannot tell whether extraction actually worked — which
    matters most exactly when it silently did not, i.e. a scanned PDF that went
    through OCR (FR-1.1). Show the first extracted characters so the input can be
    eyeballed before a 30-minute run starts.
-6. **Raise `ctx` and re-measure** before considering any model swap. See below.
+6. **Raise `ctx` and re-measure.** Gates two things, despite sitting last in this
+   list: any model swap, and the design of item 4. Measure first. See below.
 
 ## Local model options — research findings, 2026-07-29
 **Status: recorded, nothing decided**
