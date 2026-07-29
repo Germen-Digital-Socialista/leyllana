@@ -43,7 +43,7 @@ Por defecto, leyllana usa un modelo de lenguaje **local**, en tu propio computad
 
 Si quieres más potencia, hay nube, y no necesitas pagar una *API* para usarla. Si ya tienes una suscripción a Claude o a Kimi, leyllana maneja el CLI de esa suscripción por ti y aprovecha lo que ya estás pagando. Cualquier otro agente de terminal se enchufa con una línea de configuración, sin código nuevo.
 
-Eso sí, nada sale de tu computador en silencio. Cada envío a la nube hay que autorizarlo en ese mismo comando, con `--acepto-nube`. ¿Se te olvidó el *flag*? No se manda nada, y te lo dice. Las claves de *API* vienen más adelante; hoy no te hacen falta.
+Eso sí, nada sale de tu computador en silencio. En la ventana te lo pregunta antes de cada envío, con el nombre del servicio al que iría, y la respuesta que viene marcada es que no. En la terminal es el *flag* `--acepto-nube`, en ese mismo comando. ¿Se te olvidó? No se manda nada, y te lo dice. Las claves de *API* vienen más adelante; hoy no te hacen falta.
 
 Dos reglas que no se transan:
 
@@ -52,15 +52,34 @@ Dos reglas que no se transan:
 
 ## Cómo se usa hoy
 
-Todavía no hay ventana, así que por ahora se trabaja desde la terminal:
+Ya hay ventana:
 
 ```bash
-# instala, con el extra que hace falta para leer PDF
-uv sync --extra pdf
+# instala la aplicación de escritorio, con lo que hace falta para leer PDF
+uv sync --extra gui --extra pdf
 
 # copia la configuración de ejemplo y apúntala a tu modelo local
 cp leyllana.example.toml leyllana.toml
 
+# ábrela
+uv run leyllana-gui
+```
+
+A la izquierda cargas la norma, de las tres maneras de siempre: un archivo, texto pegado, o el enlace a la BCN, al Senado o a la Cámara. Eliges el nivel, aprietas Explicar, y a la derecha salen las cuatro secciones con la fuente identificada arriba. De ahí lo exportas a Markdown.
+
+Las dos quedan a la vista al mismo tiempo, y eso es a propósito. La explicación cita cada artículo, cada monto y cada fecha tal como aparecen en el original, justamente para que puedas ir a comprobarlo. En pestañas separadas estarías comparando de memoria.
+
+Mientras trabaja te dice en qué va. No un reloj de arena: la etapa, qué fragmento va procesando de cuántos, y el tiempo corrido. Una ley larga en el modelo local tarda de verdad, cincuenta minutos medidos en una de 55 artículos.
+
+Por eso Cancelar tenía que servir para algo. Mientras el modelo escribe, corta en menos de una décima de segundo (0,08 medidos). Si lo aprietas justo cuando está leyendo el fragmento, antes de soltar la primera palabra, se demora unos segundos (7,8 medidos), porque todavía no hay nada que interrumpir. Antes de esto no se podía cancelar y listo: te aguantabas los diez minutos del *timeout*.
+
+Los ajustes, qué motor, qué modelo, qué CLI, el tema claro u oscuro, el tamaño de la letra, se guardan en el mismo `leyllana.toml` que lee la terminal. Lo que cambias en la ventana lo ve el comando, y al revés. Nunca dos verdades.
+
+Abajo hay un panel de terminal plegable, por si quieres manejar a mano el CLI de tu suscripción sin salir de la aplicación. Por ahora solo en Windows.
+
+Y si prefieres la terminal, está entera:
+
+```bash
 # una norma desde el sitio oficial de la BCN
 uv run leyllana --url "https://www.bcn.cl/leychile/navegar?idNorma=1194515" --nivel publico
 
@@ -75,9 +94,9 @@ uv run leyllana --file proyecto.pdf --acepto-nube
 
 ## Estado
 
-Acceso anticipado, pero ya no es solo diseño. El motor funciona de principio a fin: le das una ley, eliges el nivel, y salen las cuatro secciones con su fuente identificada arriba. Está probado contra normas reales de la BCN, tanto con el modelo local como con la nube por suscripción.
+Acceso anticipado, y ya no es solo diseño ni solo terminal. El motor funciona de principio a fin y está probado contra normas reales de la BCN, con el modelo local y con la nube por suscripción. La ventana es lo último que se sumó: la fase 3 está lista.
 
-Lo que falta es la cara. La interfaz gráfica es la fase 3, y el instalador para quien no quiere saber nada de terminales es la 4.
+Lo que falta es el instalador, la fase 4. Hoy para partir hay que tener Python y `uv`, y eso deja afuera justo a quien esto tenía que servirle. Esa es la próxima pega.
 
 El diseño completo sigue publicado y al día: la visión (`PRD.md`), la hoja de ruta (`ROADMAP.md`) y las decisiones de arquitectura (`docs/adr/`), una por cada cosa que se decidió y por qué se decidió así. Si quieres aportar, empieza por ahí.
 

@@ -67,7 +67,8 @@ source-id -> local Qwen3 -> four sections), both single-pass and chunked.
     la mayor parte del corpus del piloto.
 - **Deferred follow-ups (minor, not blockers):** RAM-based auto-switch between the
   default and low-RAM model; a richer GPU auto-detect than the current
-  `nvidia-smi` probe; and a persistent provider for the Phase 3 GUI.
+  `nvidia-smi` probe; and a persistent provider for the Phase 3 GUI (done in
+  Phase 3, ADR 0019).
 - Shaped by: ADR 0003, 0005, 0006, 0007, 0008, 0011, 0012, 0014, 0015, 0016, 0017.
 
 ## Phase 2 — Cloud via a subscription CLI
@@ -98,22 +99,51 @@ real BCN norm with both shipped presets, in both audience levels.
 - Shaped by: ADR 0003, 0004, 0013, 0017, 0018.
 
 ## Phase 3 — GUI
-**Status: Not Started**
+**Status: Done**
 
 The PySide6 desktop app: source panel, result panel, embedded terminal, export.
+Installed as the `gui` extra (`uv sync --extra gui`), run with `leyllana-gui` or
+`python -m leyllana.gui`.
 
-- Load source, pick `nivel`, run, render the four sections, export to Markdown.
-- Processing status while working: progress / stage indicator, elapsed time,
-  percentage or fragment count when possible, and a cancel control (FR-10).
-- Visual accessibility: light / dark themes, resizable type, adequate contrast.
-- Show the source identification block in the result panel when available
+- Source on the left, result on the right in a draggable splitter, terminal in a
+  collapsible bottom dock. The split is deliberate: checking an explanation
+  against its source (FR-6.1) means seeing both at once.
+- Three input paths (file / paste / URL) handed to the same
+  `resolve_with_source` the CLI uses; `nivel` picker; export to Markdown.
+- **The GUI is a second front door, not a second implementation.** What it
+  renders and exports is the same Markdown the CLI prints, composed from the
+  same `SourceInfo.to_markdown()` + `Explanation.to_markdown()`, and its error
+  messages are the same strings as `cli.py`.
+- FR-10 in full: stage, fragment *n* of *N*, elapsed time, and a cancel control
+  that reaches the running work. **The progress bar goes indeterminate when
+  there is nothing countable rather than showing an invented percentage** — the
+  fragment count comes from the map loop of ADR 0017 and nowhere else.
+- **Cancel had to be made real first, and it is measured.** The local call was
+  one blocking request with a 600s timeout, so a button on top of it would have
+  been a lie; the response is now streamed and the token checked between frames
+  (ADR 0020). Against the real Qwen3-4B on a 2-fragment run: **0.08 s** to
+  return when the model was generating, **7.78 s** when the cancel landed during
+  prompt processing, before the first token. That second number is the window
+  ADR 0020 predicted and declines to hide.
+- Visual accessibility: light / dark / follow-the-system themes and a type-size
+  control, with the contrast ratios asserted in tests rather than assumed.
+- Source identification block shown in the result panel when available
   (FR-7.1, display side).
-- Settings: engine/provider selection, and the CLI preset for the subscription
-  path (ADR 0018).
-- Embedded `pywinpty` terminal panel (Windows first), for driving a provider CLI
-  by hand alongside the app (ADR 0004). Moved here from Phase 2: it is a Qt
-  widget and had no window to live in.
-- Shaped by: ADR 0002, 0004, 0007, 0018.
+- Settings write `leyllana.toml`, the same file the CLI reads (ADR 0021), so the
+  window and the terminal never disagree about the configured provider.
+- Consent gate (ADR 0013) as a modal before each cloud run, defaulting to *No
+  enviar*, with no remember-me option, which would be the exact door ADR 0013
+  closes.
+- Embedded `pywinpty` terminal panel (Windows first, ADR 0004). Verified against
+  pywinpty 3.0.5: spawns a shell, echoes, terminates. **It is a text view, not a
+  VT emulator** — ANSI escapes are stripped rather than interpreted, so a
+  full-screen program (vim, htop) will look wrong. Off Windows, or without
+  pywinpty, the dock shows the reason and the rest of the app is unaffected.
+- **Closed from Phase 1's deferred list:** the persistent provider. One provider
+  lives for the window's session, so only the first run pays the GGUF load.
+- **Still deferred from Phase 1:** RAM-based auto-switch between the default and
+  low-RAM model, and a richer GPU auto-detect than the `nvidia-smi` probe.
+- Shaped by: ADR 0002, 0004, 0007, 0013, 0018, 0019, 0020, 0021.
 
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
@@ -126,10 +156,12 @@ Ship something a non-technical user can install and run, then test it on real
 - Faithfulness spot-check pass (output invents nothing vs. source).
 - **Decide here what to do about local speed on long norms.** Measured in Phase 1:
   50 minutes for a 55-article law on the 4B default. Most pilot documents are far
-  shorter, and the Phase 3 GUI already commits to a progress indicator and a cancel
-  control (FR-10), which is the mitigation. If the pilot shows the wait is a real
-  obstacle for readers, the levers are a larger context (fewer fragments) or
-  routing long documents to the subscription CLI path (ADR 0018).
+  shorter, and the mitigation is now built rather than promised: the Phase 3 GUI
+  shows the stage and the fragment count as it goes, and Cancelar stops the run
+  within a token (FR-10, ADR 0019, 0020). What the pilot has to answer is whether
+  a visible, interruptible 50-minute wait is still an obstacle for real readers.
+  If it is, the levers are a larger context (fewer fragments) or routing long
+  documents to the subscription CLI path (ADR 0018).
 
 ## Phase 5 — Cloud providers by API key
 **Status: Not Started**
