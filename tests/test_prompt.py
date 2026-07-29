@@ -38,6 +38,68 @@ def test_nivel_changes_register():
     assert build("t", Nivel.PUBLICO).system != build("t", Nivel.TECNICO).system
 
 
+def test_el_registro_llano_solo_aplica_al_nivel_publico():
+    # La causa concreta de que las dos salidas fueran casi iguales: "lenguaje
+    # llano" aparecia en el preambulo y en la descripcion de 'Articulos clave',
+    # los dos fuera del switch de nivel, asi que el nivel tecnico recibia la orden
+    # de escribir llano y solo tenia "permitido" no hacerlo.
+    publico = build("Articulo 1. Algo.", Nivel.PUBLICO).system
+    tecnico = build("Articulo 1. Algo.", Nivel.TECNICO).system
+    assert "lenguaje llano" in publico
+    assert "lenguaje llano" not in tecnico
+
+
+def test_el_nivel_tecnico_manda_en_vez_de_autorizar():
+    # "Puedes usar el registro tecnico-legislativo" no cambiaba nada: un permiso
+    # no es una instruccion.
+    tecnico = build("Articulo 1. Algo.", Nivel.TECNICO).system
+    assert "puedes usar" not in tecnico.lower()
+    assert "usa el registro tecnico-legislativo" in tecnico.lower()
+
+
+def test_solo_el_nivel_publico_topea_los_articulos():
+    # El tope hace legible la salida para quien no es abogado, y le quitaria a
+    # quien trabaja el articulado justamente lo que necesita.
+    assert "cinco o seis" in build("t", Nivel.PUBLICO).system
+    assert "cinco o seis" not in build("t", Nivel.TECNICO).system
+    assert "no hay tope" in build("t", Nivel.TECNICO).system
+
+
+def test_el_nivel_tecnico_pide_los_puntos_de_una_norma_chilena():
+    tecnico = build("t", Nivel.TECNICO).system.lower()
+    for punto in (
+        "ambito de aplicacion",
+        "sujetos obligados",
+        "plazos",
+        "regimen sancionatorio",
+        "fiscaliza",
+        "control",
+        "reglamento",
+        "entrada en vigencia",
+        "disposiciones transitorias",
+        "derogan",
+    ):
+        assert punto in tecnico, punto
+
+
+def test_la_lista_del_nivel_tecnico_va_condicionada_al_texto():
+    # Una lista de puntos es una lista de casilleros, y un casillero vacio invita
+    # a rellenarlo. Sin esta condicion el nivel tecnico inventaria el quorum o el
+    # organo fiscalizador cuando la fuente no los menciona.
+    tecnico = build("t", Nivel.TECNICO).system
+    assert "Cuando el texto entregado lo diga" in tecnico
+    assert "no lo pongas" in tecnico
+    assert "para esta explicacion no existe" in tecnico
+
+
+def test_las_cuatro_secciones_se_llaman_igual_en_los_dos_niveles():
+    # Los nombres son el contrato de salida y lo que busca el parseo (ADR 0007);
+    # lo que cambia es su descripcion, no su titulo.
+    for titulo in ("Que hace", "A quien afecta", "Articulos clave", "En una frase"):
+        assert titulo in build("t", Nivel.PUBLICO).system
+        assert titulo in build("t", Nivel.TECNICO).system
+
+
 def test_build_includes_scoped_verbatim_citation_clause():
     # ADR 0014: los identificadores citados van tal como aparecen en el texto.
     p = build("Articulo 5. Algo.", Nivel.PUBLICO)
