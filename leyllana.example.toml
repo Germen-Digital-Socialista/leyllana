@@ -3,6 +3,11 @@
 # Copie este archivo como `leyllana.toml` (se busca en el directorio actual) o
 # pase la ruta con `--config`. Si no hay archivo, se usan los valores por defecto
 # de abajo, que son los del proveedor local.
+#
+# La ventana de Ajustes de la aplicacion escribe en ese mismo `leyllana.toml`, de
+# modo que la GUI y la CLI leen la misma configuracion (ADR 0021). Al guardar
+# desde la aplicacion el archivo se reescribe entero y los comentarios que usted
+# haya agregado a mano se pierden: la referencia comentada es este archivo.
 
 [engine]
 # "local" (por defecto, ADR 0005: nada sale de su equipo) o "cli" (proveedor de
@@ -73,3 +78,15 @@ timeout = 600
 # Contexto del modelo detras del CLI, para no trocear un documento que entra
 # entero (ADR 0017).
 ctx_tokens = 100000
+
+
+# ---------------------------------------------------------------------------
+# Ventana (solo afecta a la GUI; la CLI ignora este bloque)
+# ---------------------------------------------------------------------------
+
+[gui]
+# "sistema" sigue el tema de Windows; tambien "claro" u "oscuro".
+theme = "sistema"
+
+# Cuerpo del panel de resultado, en puntos. Un texto legal se lee por largo rato.
+font_size = 14

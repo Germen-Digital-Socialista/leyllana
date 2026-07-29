@@ -6,10 +6,18 @@ de MuniGPT. Se lee de ``leyllana.toml`` con ``tomllib`` (stdlib, Python >=3.11);
 si no existe, se usan los defaults de abajo. Ademas del modelo, la config lleva la
 ejecucion del ``llama-server`` (binario, GPU) y los parametros de generacion
 (ADR 0012, 0016).
+
+Desde la GUI (ADR 0021) este archivo tambien se **escribe**: lo que se ajusta en
+la ventana de Ajustes es lo mismo que lee la CLI, para que no haya dos verdades
+sobre que proveedor esta configurado. ``tomllib`` solo sabe leer, asi que la
+escritura es un emisor propio, acotado a los campos que estas dataclasses
+declaran.
 """
 
 from __future__ import annotations
 
+import os
+import tempfile
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -65,10 +73,24 @@ class EngineConfig:
 
 
 @dataclass(frozen=True)
+class GuiConfig:
+    """Preferencias visuales de la ventana (PRD, accesibilidad visual).
+
+    ``theme`` vale ``sistema`` (sigue al de Windows), ``claro`` u ``oscuro``.
+    ``font_size`` es el cuerpo del panel de resultado en puntos: un texto legal se
+    lee de corrido y por largo rato, asi que poder agrandarlo no es un adorno.
+    """
+
+    theme: str = "sistema"
+    font_size: int = 14
+
+
+@dataclass(frozen=True)
 class Config:
     """Config raiz de la app."""
 
     engine: EngineConfig = field(default_factory=EngineConfig)
+    gui: GuiConfig = field(default_factory=GuiConfig)
 
 
 def _model_from_dict(data: dict) -> ModelConfig:
@@ -85,12 +107,28 @@ def _cli_from_dict(data: dict) -> CliConfig:
     )
 
 
+def _gui_from_dict(data: dict) -> GuiConfig:
+    return GuiConfig(
+        theme=data.get("theme", "sistema"),
+        font_size=int(data.get("font_size", 14)),
+    )
+
+
+def resolve_path(path: str | Path | None = None) -> Path:
+    """Ruta del archivo de config: la explicita, o ``./leyllana.toml``.
+
+    Existe para que la GUI pueda decirle al usuario que archivo esta editando y
+    escribir en ese mismo, en vez de adivinarlo por su cuenta.
+    """
+    return Path(path) if path is not None else Path(CONFIG_FILENAME)
+
+
 def load(path: str | Path | None = None) -> Config:
     """Carga la config desde TOML, o devuelve los defaults si no hay archivo.
 
     ``path`` explicito, o ``./leyllana.toml`` si existe, o defaults.
     """
-    candidate = Path(path) if path is not None else Path(CONFIG_FILENAME)
+    candidate = resolve_path(path)
     if not candidate.is_file():
         return Config()
 
@@ -110,4 +148,90 @@ def load(path: str | Path | None = None) -> Config:
         max_tokens=int(engine_data.get("max_tokens", 1024)),
         threads=int(engine_data.get("threads", 0)),
     )
-    return replace(Config(), engine=engine)
+    return replace(Config(), engine=engine, gui=_gui_from_dict(data.get("gui", {})))
+
+
+def _toml_value(value) -> str:
+    """Serializa un escalar o una lista de cadenas a TOML."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    if isinstance(value, (tuple, list)):
+        return "[" + ", ".join(_toml_value(str(v)) for v in value) + "]"
+    escapado = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escapado}"'
+
+
+def _table(nombre: str, pares: list[tuple[str, object]]) -> list[str]:
+    """Una tabla TOML. Los valores en ``None`` se omiten, no se escriben vacios."""
+    filas = [f"{k} = {_toml_value(v)}" for k, v in pares if v is not None]
+    if not filas:
+        return []
+    return [f"[{nombre}]", *filas, ""]
+
+
+def dumps(config: Config) -> str:
+    """Devuelve el TOML de ``config``, solo con los campos que la app declara."""
+    e = config.engine
+    lineas: list[str] = [
+        "# Escrito por leyllana. Los comentarios que agregue a mano se pierden al",
+        "# guardar desde la aplicacion; la referencia comentada es",
+        "# leyllana.example.toml.",
+        "",
+    ]
+    lineas += _table(
+        "engine",
+        [
+            ("provider", e.provider),
+            ("server_path", e.server_path),
+            ("gpu", e.gpu),
+            ("temperature", e.temperature),
+            ("max_tokens", e.max_tokens),
+            ("threads", e.threads),
+        ],
+    )
+    lineas += _table(
+        "engine.models.default",
+        [("path", e.default_model.path), ("ctx", e.default_model.ctx)],
+    )
+    lineas += _table(
+        "engine.models.fallback",
+        [("path", e.fallback_model.path), ("ctx", e.fallback_model.ctx)],
+    )
+    lineas += _table(
+        "engine.cli",
+        [
+            ("preset", e.cli.preset),
+            ("command", list(e.cli.command) or None),
+            ("model", e.cli.model),
+            ("timeout", e.cli.timeout),
+            ("ctx_tokens", e.cli.ctx_tokens),
+        ],
+    )
+    lineas += _table(
+        "gui", [("theme", config.gui.theme), ("font_size", config.gui.font_size)]
+    )
+    return "\n".join(lineas)
+
+
+def save(config: Config, path: str | Path | None = None) -> Path:
+    """Escribe ``config`` en el archivo TOML y devuelve la ruta escrita.
+
+    La escritura es atomica (archivo temporal en la misma carpeta y luego
+    ``os.replace``): si algo falla a medio guardar, el usuario se queda con su
+    config anterior intacta y no con un archivo truncado que ya no carga.
+    """
+    destino = resolve_path(path)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporal = tempfile.mkstemp(
+        dir=str(destino.parent), prefix=destino.name, suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(dumps(config))
+        os.replace(temporal, destino)
+    except BaseException:
+        Path(temporal).unlink(missing_ok=True)
+        raise
+    return destino
