@@ -113,6 +113,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0019 | Progress and cancellation as an optional seam in `explain()`     | Accepted |
 | 0020 | Streaming local generation, so cancelling stops the work        | Accepted |
 | 0021 | The GUI reads and writes `leyllana.toml`                        | Accepted |
+| 0022 | The terminal panel mirrors what the engine sends to the cloud   | Accepted |
 
 ## Further reading
 
