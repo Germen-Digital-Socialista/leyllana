@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from ..prompt import Prompt
+from .progress import CancelToken
 
 
 class ProviderError(RuntimeError):
@@ -33,6 +34,12 @@ class ConsentRequired(RuntimeError):
 class Provider(Protocol):
     """Backend que convierte un ``Prompt`` en texto de respuesta."""
 
-    def generate(self, prompt: Prompt) -> str:
-        """Genera la respuesta del modelo para ``prompt``."""
+    def generate(self, prompt: Prompt, *, cancel: CancelToken | None = None) -> str:
+        """Genera la respuesta del modelo para ``prompt``.
+
+        ``cancel`` es opcional y solo lo usa quien puede interrumpirse de verdad
+        (el proveedor local lee la respuesta en streaming y corta entre tokens,
+        ADR 0020). Un proveedor que no puede detenerse a media llamada lo ignora
+        sin fingir que lo respeta.
+        """
         ...

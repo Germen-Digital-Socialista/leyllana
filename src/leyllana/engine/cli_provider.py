@@ -21,6 +21,7 @@ from pathlib import Path
 from ..config import Config
 from ..prompt import Prompt
 from .base import ProviderError
+from .progress import CancelToken
 
 # Argv verificado de cada CLI probado. ``{system_file}`` marca donde va la ruta
 # al archivo con el system prompt; el CLI que no tenga ese flag lo recibe al
@@ -90,7 +91,7 @@ class CliProvider:
             )
         return preset
 
-    def generate(self, prompt: Prompt) -> str:
+    def generate(self, prompt: Prompt, *, cancel: CancelToken | None = None) -> str:
         """Corre el CLI con ``prompt`` y devuelve su respuesta de texto."""
         template = self._template()
         usa_archivo = any(_SYSTEM_SLOT in arg for arg in template)

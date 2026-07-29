@@ -16,6 +16,15 @@ from ..prompt import build, build_extract
 from ..types import Explanation, Nivel
 from .base import ConsentRequired, Provider
 from .chunking import chars_for_tokens, estimate_tokens, split_structural
+from .progress import (
+    Cancelled,
+    CancelToken,
+    Progress,
+    ProgressFn,
+    Stage,
+    check,
+    report,
+)
 from .registry import get_provider
 
 # Reserva de tokens para el system prompt y sus instrucciones (fuera del texto).
@@ -42,6 +51,10 @@ def explain(
     nivel: Nivel,
     config: Config | None = None,
     consent: bool = False,
+    *,
+    progress: ProgressFn | None = None,
+    cancel: CancelToken | None = None,
+    provider: Provider | None = None,
 ) -> Explanation:
     """Explica ``text`` en el ``nivel`` dado y devuelve una ``Explanation``.
 
@@ -52,12 +65,28 @@ def explain(
     ``consent`` es la accion afirmativa que exige ADR 0013: sin ella, un proveedor
     que saca el documento del equipo levanta ``ConsentRequired`` antes de enviar
     nada. El proveedor local no la necesita ni la mira.
+
+    Los tres parametros de palabra clave son para la GUI (ADR 0019) y son
+    opcionales: omitidos, esta funcion se comporta exactamente como antes.
+
+    - ``progress`` recibe un ``Progress`` en cada etapa y en cada fragmento.
+    - ``cancel`` se consulta antes de cada llamada al proveedor; si el usuario
+      cancelo, se levanta ``Cancelled``.
+    - ``provider`` reutiliza un proveedor ya construido en vez de crear uno. Es lo
+      que permite a la GUI mantener el ``llama-server`` caliente entre corridas,
+      en lugar de recargar el GGUF cada vez.
     """
     cfg = config if config is not None else Config()
-    provider = get_provider(cfg)
+    check(cancel)
+    if provider is None:
+        report(progress, Stage.CARGANDO)
+        provider = get_provider(cfg)
     _check_consent(provider, consent)
-    condensed = _condense(text, provider, cfg)
-    raw = provider.generate(build(condensed, nivel))
+    condensed = _condense(text, provider, cfg, progress=progress, cancel=cancel)
+    check(cancel)
+    report(progress, Stage.GENERANDO)
+    raw = provider.generate(build(condensed, nivel), cancel=cancel)
+    report(progress, Stage.VERIFICANDO)
     return parse(raw)
 
 
@@ -88,23 +117,36 @@ def _budget_tokens(config: Config, provider: Provider) -> int:
 
 
 def _condense(
-    text: str, provider: Provider, config: Config, _depth: int = 0
+    text: str,
+    provider: Provider,
+    config: Config,
+    _depth: int = 0,
+    *,
+    progress: ProgressFn | None = None,
+    cancel: CancelToken | None = None,
 ) -> str:
     """Devuelve texto que cabe en el contexto: el original, o puntos clave (ADR 0017).
 
     Si ``text`` cabe, se devuelve tal cual (pasada unica). Si no, se parte en
     fragmentos por estructura, se extraen puntos clave fieles de cada uno (map) y se
     juntan; si el conjunto aun no cabe, se reduce jerarquicamente hasta un tope.
+
+    El bucle del map es el unico trabajo contable de toda la corrida, asi que es de
+    aqui que sale el "fragmento 3 de 13" que pide FR-10, y es aqui donde la
+    cancelacion corta entre fragmentos.
     """
     budget = _budget_tokens(config, provider)
     if estimate_tokens(text) <= budget or budget <= 0:
         return text
 
     max_chars = chars_for_tokens(budget)
-    points = [
-        provider.generate(build_extract(chunk)).strip()
-        for chunk in split_structural(text, max_chars=max_chars)
-    ]
+    chunks = split_structural(text, max_chars=max_chars)
+    total = len(chunks)
+    points: list[str] = []
+    for i, chunk in enumerate(chunks, start=1):
+        check(cancel)
+        report(progress, Stage.EXTRAYENDO, fragmento=i, total=total)
+        points.append(provider.generate(build_extract(chunk), cancel=cancel).strip())
     pooled = "\n".join(p for p in points if p)
 
     if (
@@ -112,7 +154,10 @@ def _condense(
         and _depth < _MAX_REDUCE_DEPTH
         and len(pooled) < len(text)
     ):
-        return _condense(pooled, provider, config, _depth + 1)
+        report(progress, Stage.ANALIZANDO, detalle=f"reduccion {_depth + 1}")
+        return _condense(
+            pooled, provider, config, _depth + 1, progress=progress, cancel=cancel
+        )
     return pooled
 
 
@@ -169,4 +214,13 @@ def parse(raw: str) -> Explanation:
     return Explanation(**valores)
 
 
-__all__ = ["explain", "parse", "ParseError", "ConsentRequired"]
+__all__ = [
+    "explain",
+    "parse",
+    "ParseError",
+    "ConsentRequired",
+    "Cancelled",
+    "CancelToken",
+    "Progress",
+    "Stage",
+]

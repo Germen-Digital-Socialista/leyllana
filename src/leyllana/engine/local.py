@@ -12,6 +12,7 @@ import atexit
 from ..config import Config
 from ..prompt import Prompt
 from .base import ProviderError
+from .progress import CancelToken
 from .server import LlamaServer, chat_completion
 
 
@@ -45,7 +46,7 @@ class LocalProvider:
             atexit.register(self._server.stop)
         return self._server.ensure()
 
-    def generate(self, prompt: Prompt) -> str:
+    def generate(self, prompt: Prompt, *, cancel: CancelToken | None = None) -> str:
         """Genera la respuesta del modelo local para ``prompt``."""
         base = self._ensure_server()
         engine = self._config.engine
@@ -58,7 +59,19 @@ class LocalProvider:
             messages,
             temperature=engine.temperature,
             max_tokens=engine.max_tokens,
+            cancel=cancel,
         )
+
+    def close(self) -> None:
+        """Detiene el ``llama-server`` y libera la RAM del modelo.
+
+        La CLI no lo necesita (el ``atexit`` de arriba basta para un proceso que
+        termina), pero la GUI mantiene el proveedor vivo entre corridas y necesita
+        poder soltarlo cuando cambia la config o se cierra la ventana.
+        """
+        if self._server is not None:
+            self._server.stop()
+            self._server = None
 
 
 __all__ = ["LocalProvider"]

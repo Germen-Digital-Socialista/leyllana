@@ -22,6 +22,7 @@ import urllib.request
 from pathlib import Path
 
 from .base import ProviderError
+from .progress import CancelToken
 
 # El arranque en frio incluye cargar el GGUF; en CPU puede tardar (ADR 0015).
 _HEALTH_TIMEOUT = 180.0
@@ -69,6 +70,7 @@ def chat_completion(
     temperature: float,
     max_tokens: int,
     timeout: float = _REQUEST_TIMEOUT,
+    cancel: CancelToken | None = None,
 ) -> str:
     """Llama ``/v1/chat/completions`` (no streaming) y devuelve el texto asistente.
 

@@ -23,7 +23,7 @@ class _FakeProvider:
         self.synth_calls = 0
         self.last_synth_user = None
 
-    def generate(self, prompt):
+    def generate(self, prompt, *, cancel=None):
         if "Extrae los puntos clave" in prompt.system:
             n = self.extract_calls = self.extract_calls + 1
             return f"- Punto clave {n} (Articulo {n})."
