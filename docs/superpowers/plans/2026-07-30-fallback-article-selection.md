@@ -1,3 +1,9 @@
+**Status: Implemented 2026-07-30.** All 9 tasks complete, TDD throughout, one commit per
+task (`ad8bc92`..`69cd873`). Full suite: 236 passed, 2 skipped (the two real-model smoke
+tests, correctly gated behind env vars that point at real binaries/GGUFs). One real bug
+found and fixed during Task 3 (a wrong test assertion, not an implementation defect --
+`ArticleChunk.label` captures the whole first line by design, not just "Articulo N").
+
 # Fallback article selection (BM25 + reranker) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
