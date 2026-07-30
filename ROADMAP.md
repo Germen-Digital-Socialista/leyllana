@@ -273,10 +273,14 @@ because the two get conflated easily and only one of them is on the critical pat
 ### The real levers on the current pipeline, in order of size
 
 1. **Fewer calls.** Item 6: `ctx 16384` turns 28 calls into 3, measured 4,8 min.
-2. **Prompt caching, which we are not using.** llama.cpp supports `cache_prompt` and
-   host-memory prompt caching: a shared prefix is not reprocessed. Our system prompt
-   is byte-identical across all 28 calls of a run and is re-tokenized every time.
-   Free, no quality risk, unexplored.
+2. ~~**Prompt caching.**~~ **Checked and discarded the same day.** This was first
+   written down as a free win we were ignoring. It is not: `--cache-prompt` is
+   **enabled by default** in the build we ship, and the log of the 59,6 min run proves
+   it was already working, reusing a mean of **12,6%** of each prompt (up to 80% on
+   one call). The reuse is small for a structural reason, not a fixable one: the only
+   shared prefix is the system prompt, because every fragment's user text differs.
+   And prompt processing is only ~27 s of a ~134 s call, so even eliminating it
+   entirely caps the gain near 20%. Recorded so nobody spends a session on it twice.
 3. **Prompt compression.** Felipe's instinct already exists as a technique:
    **LLMLingua-2** is a small trained model that classifies which tokens to drop, at
    2-5x compression and up to 2,9x lower latency; the original LLMLingua reports up
