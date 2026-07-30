@@ -609,6 +609,47 @@ already has) with date-bounded filtering standing in for the vigencia field BCN
 does not provide. Still Felipe's decision, still needs its own ADR once decided;
 recorded here so the numbers and the sources are not re-derived next session.
 
+### Corpus scope corrected to Ley only, and measured, 2026-07-30
+
+Felipe corrected the scope: leyllana explains **leyes**. Decreto Ley, Decreto
+con Fuerza de Ley, and every other norma type are referenced, never indexed or
+explained. Two things followed from that, both verified rather than estimated:
+
+- **35.574 is version records, not distinct laws.** BCN re-publishes a new
+  dated record of a Ley every time it is amended (`.../20848`,
+  `.../20848/es@2015-01-01`, `.../20848/es@2222-02-02` are the same law, three
+  versions). Counted distinct base identifiers via SPARQL: **16.064** current-
+  form Leyes.
+- **Measured document size on 34 real fetches** from `leychile.cl` (a
+  randomized SPARQL sample, flagged because the distribution is extremely
+  heavy-tailed — a 677 KB omnibus law and a cluster of ~1,2 KB reserved/stub
+  laws turned up in the same sample): trimmed-mean **13,5 KB raw XML/law**
+  (range across estimators: 4,2–48,6 KB). Extrapolated over 16.064 laws: **~0,22
+  GB raw text** (range 0,07–0,78 GB). Measured the XML-to-plain-text ratio on
+  one document (0,73) and applied the project's own 3,5 chars/token
+  (`engine/chunking.py`): **~45 million tokens** total (range 14M–163M).
+
+**This corrects the "multi-gigabyte" line in the section above** — that was
+sized against the bigger Ley+DL+DFL/53.215 universe this section has since
+narrowed away from. At Ley-only scope, the corpus is small enough that
+bulk-indexing everything is no longer ruled out by size. What is still
+unmeasured, and is the real reason the design spec keeps the two-stage
+architecture rather than switching to bulk indexing on this data alone: actual
+embedding throughput on this machine for full-length legal text (published
+short-sentence-encoder throughput figures do not transfer), the ~2–4,5 hour
+one-time ingestion cost against a public agency's service at a polite request
+rate, and the staleness problem — no vigencia field means every refresh has to
+re-check the whole set rather than only what changed.
+
+Two ideas raised alongside this and explicitly deferred, not designed: a
+corpus-storage compression algorithm (LLMLingua-2-style, already a lead in the
+section above), and using retrieval to feed the low-RAM Qwen3-1.7B fallback
+only the most relevant passages instead of the whole document. The second one
+is not a small addition — it would apply to the base `explain()` path for every
+reader, not just the new retrieval figures, and it reopens ADR 0017's
+specific, reasoned call that there is no query in the explain task. Recorded
+here so it is not lost, not folded into the current spec.
+
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
 

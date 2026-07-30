@@ -42,28 +42,51 @@ query only; it does not reopen ADR 0017's decision for the base explain path.
 
 ## 3. Corpus and architecture: two-stage retrieval
 
-### 3.1 Why not bulk-index everything
+### 3.1 Corpus scope: Ley only, not Ley+DL+DFL
 
-Verified 2026-07-30 against BCN's own SPARQL endpoint (recorded in ROADMAP.md):
-the Ley+DL+DFL universe is **53.215** documents, not the ~21.000 originally
-assumed, and BCN's own linked data has no field marking a norm in force or
-repealed (confirmed against the `bcn-norms` ontology and an IFLA paper naming
-this an open, unresolved problem in the same dataset). Downloading and indexing
-all 53.215 full documents up front would mean: a large one-time ingestion job
-against a public agency's service, a multi-gigabyte local store with no natural
-place to stop, and a staleness problem with no way to know what changed, because
-the vigencia signal does not exist. Research recorded in ROADMAP.md found this
-is not the pattern production legal-RAG systems use for this class of problem.
+Corrected 2026-07-30, superseding the Ley+DL+DFL framing this section originally
+had. This project is about **leyes**. Decreto Ley and Decreto con Fuerza de Ley,
+and every other norma type (Decreto, Resolución, and the rest of the 748.783-row
+universe), are never indexed or explained — when one is relevant, it is surfaced
+as a reference/pointer for the user to look up themselves, the same way a
+citation works today.
+
+Verified against BCN's own SPARQL endpoint: **35.574** records of type Ley
+include every historical version of every law (BCN re-publishes a dated record
+each time a law is amended); the distinct, current-form count is **16.064**.
+BCN's own linked data still has no field marking a norm in force or repealed
+(confirmed against the `bcn-norms` ontology and an IFLA paper naming this an
+open, unresolved problem in the same dataset).
+
+### 3.1.1 Why not bulk-index everything anyway
+
+Measured 2026-07-30 (34 real documents fetched from `leychile.cl`, a randomized
+SPARQL sample): Chilean statute size is extremely heavy-tailed — a 677 KB
+omnibus law and a cluster of ~1,2 KB reserved/stub laws turned up in the same
+sample. Trimmed-mean estimate: ~13,5 KB raw XML per law, putting the full
+16.064-law corpus at roughly **0,22 GB raw text** (range 0,07–0,78 GB across
+estimators) and, using the measured XML-to-plain-text ratio (0,73) and the
+project's own established 3,5 chars/token (`chunking.py`), roughly **45 million
+tokens** total (range 14M–163M). This is genuinely small — smaller than this
+section originally assumed when it was sized against the bigger Ley+DL+DFL
+universe. Bulk-indexing all 16.064 Leyes is not architecturally ruled out by
+size the way it looked at first. What still argues for the two-stage design over
+bulk indexing (section 3.2) is unmeasured, not the corpus size: a real embedding
+throughput benchmark on this machine (not the CPU-throughput figures published
+for short-sentence encoders, which do not transfer to full-length legal text),
+the ~2–4,5 hour one-time ingestion against a public agency's service, and the
+staleness problem — no vigencia field means every refresh has to re-check the
+whole set rather than only what changed.
 
 ### 3.2 The two stages
 
 **Stage 1 — local metadata index, no network at query time.** Built once from
 BCN's SPARQL endpoint (the refresh mechanism is left to plan/implementation
 time — see section 9):
-id, title, type, `createdBy` (issuing organism), publish date, promulgation
-date, for the Ley+DL+DFL universe. No full text. Small enough that indexing cost
-is not a real constraint (short-text embedding/indexing at this row count is
-fast on CPU, per the research in ROADMAP.md).
+id, title, `createdBy` (issuing organism), publish date, promulgation date, for
+the 16.064 distinct, current-form Leyes (section 3.1). No full text. Small
+enough that indexing cost is not a real constraint (short-text embedding/
+indexing at this row count is fast on CPU, per the research in ROADMAP.md).
 
 **Stage 2 — full text on demand, for the shortlisted candidates only.** At query
 time:
@@ -90,6 +113,23 @@ time:
 A hybrid variant of stage 2 (e.g. adding semantic/dense search on top of the
 keyword match) stays open for future research once a working v1 exists to
 measure against. Not designed further here; not a commitment.
+
+A local-storage compression algorithm for the corpus (e.g. LLMLingua-2-style
+prompt compression, already noted as a lead in ROADMAP.md's earlier corpus
+research) stays open for future investigation once there is a working v1 to
+measure the actual storage/token cost of.
+
+A retrieval-driven chunk-selection path for the low-RAM (Qwen3-1.7B) fallback on
+low-end machines — feeding that model only the most relevant retrieved
+passages instead of the whole document — was raised alongside this spec but is
+explicitly **not** part of it. It is a different capability: it would apply to
+the base `explain()` path for every reader figure, not only `dirigente`/
+`autoridad comunal`, and it reopens the specific call ADR 0017 already made
+("no query in the explain task" — see section 2). That call was made with a
+concrete faithfulness argument (long-context positional bias; map-reduce
+matched or beat single-pass accuracy) and with Phase 1's finding that Qwen3-1.7B
+fabricates confidently on long norms. Reopening it needs its own brainstorming
+round and cannot ride in on this spec's approval.
 
 A small hand-picked list of foundational laws (Ley 18.695, Ley 19.418, etc.)
 was considered as a simpler alternative to the metadata index. Rejected as the
@@ -197,3 +237,8 @@ output: existing 4 sections (unchanged) + section 5 (new), each citation traced
   behavior beyond the name change.
 - The refresh mechanism for the stage-1 metadata index (cron, manual, on-demand)
   — left to plan/implementation time.
+- A compression algorithm for corpus storage/tokens (LLMLingua-2-style),
+  deferred per section 3.3.
+- Retrieval-driven chunk selection for the low-RAM (Qwen3-1.7B) fallback path,
+  deferred per section 3.3 — reopens ADR 0017 and needs its own brainstorming
+  round.
