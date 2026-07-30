@@ -1,5 +1,27 @@
-from leyllana.prompt import GUARDRAIL, build
-from leyllana.types import DISCLAIMER, Explanation, Nivel
+from leyllana.prompt import GUARDRAIL, build, build_with_selection
+from leyllana.types import DISCLAIMER, ArticleChunk, Explanation, Nivel
+
+
+def test_build_with_selection_includes_articles_verbatim():
+    articles = [
+        ArticleChunk(label="Articulo 5", text="Articulo 5. El plazo es de 10 dias."),
+        ArticleChunk(label="Articulo 9", text="Articulo 9. La multa es de 50 UTM."),
+    ]
+    p = build_with_selection("resumen de la ley", articles, Nivel.PUBLICO)
+    assert "Articulo 5. El plazo es de 10 dias." in p.user
+    assert "Articulo 9. La multa es de 50 UTM." in p.user
+    assert "resumen de la ley" in p.user
+
+
+def test_build_with_selection_tells_model_not_to_choose():
+    p = build_with_selection("resumen", [ArticleChunk(label="Articulo 1", text="x")], Nivel.PUBLICO)
+    assert "preseleccionados" in p.system.lower()
+
+
+def test_build_with_selection_keeps_the_four_sections():
+    p = build_with_selection("r", [ArticleChunk(label="Articulo 1", text="x")], Nivel.PUBLICO)
+    for titulo in ("Que hace", "A quien afecta", "Articulos clave", "En una frase"):
+        assert titulo in p.system
 
 
 def test_build_includes_guardrail_and_sections():

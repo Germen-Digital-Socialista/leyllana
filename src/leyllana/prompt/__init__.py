@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..types import Nivel
+from ..types import ArticleChunk, Nivel
 
 # Guardrail anti-invencion (ADR 0008): el modelo solo puede resumir lo que esta
 # en el texto. Si el texto no alcanza, lo dice en vez de adivinar.
@@ -168,6 +168,50 @@ def build(text: str, nivel: Nivel) -> Prompt:
     return Prompt(system=system, user=user)
 
 
+# Se antepone a la instruccion de nivel existente: le dice al modelo que la
+# eleccion de "elige a lo mas cinco o seis" ya esta resuelta, en vez de duplicar
+# o contradecir esa frase dentro de _NIVEL_INSTRUCTIONS.
+_SELECTION_INSTRUCTION = (
+    "Los articulos de la seccion 'Articulos clave' YA fueron preseleccionados por un "
+    "sistema de busqueda, y vienen listados abajo bajo 'Articulos preseleccionados'. "
+    "La instruccion de 'elige a lo mas cinco o seis articulos' de mas arriba ya esta "
+    "resuelta: explica esos articulos y solo esos, en el mismo orden en que aparecen. "
+    "No elijas otros articulos, no agregues los que falten, no dejes ninguno de estos "
+    "fuera."
+)
+
+
+def build_with_selection(
+    overview: str, articles: list[ArticleChunk], nivel: Nivel
+) -> Prompt:
+    """Arma el ``Prompt`` cuando los articulos clave ya fueron preseleccionados
+    (BM25 + reranker opcional, engine/ranking.py) en vez de dejar que el modelo
+    elija.
+
+    Solo tiene sentido para PUBLICO (el unico nivel con tope de articulos); ver
+    docs/superpowers/specs/2026-07-30-fallback-article-selection-design.md.
+    """
+    secciones = "\n".join(_SECTIONS[nivel])
+    system = (
+        "Eres leyllana, un asistente que explica leyes y boletines chilenos "
+        "(espanol de Chile).\n\n"
+        f"{GUARDRAIL}\n\n"
+        f"{CITATION}\n\n"
+        f"{_NIVEL_INSTRUCTIONS[nivel]}\n\n"
+        f"{_SELECTION_INSTRUCTION}\n\n"
+        "Responde SIEMPRE con estas cuatro secciones, en este orden, cada una "
+        "empezando por su titulo exacto al inicio de una linea:\n"
+        f"{secciones}\n\n"
+        f"{FORMATO}"
+    )
+    articulos_texto = "\n\n".join(f"{a.label}\n{a.text}" for a in articles)
+    user = (
+        f"Resumen de la norma o boletin:\n\n{overview}\n\n"
+        f"Articulos preseleccionados:\n\n{articulos_texto}"
+    )
+    return Prompt(system=system, user=user)
+
+
 def build_extract(chunk: str) -> Prompt:
     """Prompt para extraer puntos clave fieles de un FRAGMENTO (map de ADR 0017).
 
@@ -188,4 +232,12 @@ def build_extract(chunk: str) -> Prompt:
     return Prompt(system=system, user=user)
 
 
-__all__ = ["Prompt", "build", "build_extract", "GUARDRAIL", "CITATION", "FORMATO"]
+__all__ = [
+    "Prompt",
+    "build",
+    "build_extract",
+    "build_with_selection",
+    "GUARDRAIL",
+    "CITATION",
+    "FORMATO",
+]
