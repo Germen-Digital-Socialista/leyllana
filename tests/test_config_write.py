@@ -24,6 +24,7 @@ def _config_completa() -> Config:
             provider="cli",
             default_model=ModelConfig(path=r"C:\modelos\qwen3-4b.gguf", ctx=8192),
             fallback_model=ModelConfig(path="qwen3-1.7b.gguf", ctx=2048),
+            reranker_model=ModelConfig(path="qwen3-reranker-0.6b.gguf", ctx=2048),
             cli=CliConfig(
                 preset="claude",
                 command=("otro", "--flag"),

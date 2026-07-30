@@ -64,6 +64,7 @@ class EngineConfig:
     provider: str = "local"
     default_model: ModelConfig = field(default_factory=ModelConfig)
     fallback_model: ModelConfig = field(default_factory=lambda: ModelConfig(ctx=2048))
+    reranker_model: ModelConfig = field(default_factory=lambda: ModelConfig(ctx=2048))
     cli: CliConfig = field(default_factory=CliConfig)
     server_path: str | None = None
     gpu: str = "auto"
@@ -141,6 +142,7 @@ def load(path: str | Path | None = None) -> Config:
         provider=engine_data.get("provider", "local"),
         default_model=_model_from_dict(models_data.get("default", {})),
         fallback_model=_model_from_dict(models_data.get("fallback", {"ctx": 2048})),
+        reranker_model=_model_from_dict(models_data.get("reranker", {"ctx": 2048})),
         cli=_cli_from_dict(engine_data.get("cli", {})),
         server_path=engine_data.get("server_path"),
         gpu=engine_data.get("gpu", "auto"),
@@ -198,6 +200,10 @@ def dumps(config: Config) -> str:
     lineas += _table(
         "engine.models.fallback",
         [("path", e.fallback_model.path), ("ctx", e.fallback_model.ctx)],
+    )
+    lineas += _table(
+        "engine.models.reranker",
+        [("path", e.reranker_model.path), ("ctx", e.reranker_model.ctx)],
     )
     lineas += _table(
         "engine.cli",

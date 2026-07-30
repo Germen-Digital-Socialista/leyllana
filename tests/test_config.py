@@ -32,6 +32,27 @@ def test_engine_generation_defaults():
     assert cfg.engine.threads == 0
 
 
+def test_reranker_model_defaults():
+    cfg = Config()
+    assert cfg.engine.reranker_model.path is None
+    assert cfg.engine.reranker_model.ctx == 2048
+
+
+def test_load_reads_reranker_model(tmp_path):
+    toml = tmp_path / "leyllana.toml"
+    toml.write_text(
+        "[engine]\n"
+        'provider = "local"\n'
+        "[engine.models.reranker]\n"
+        'path = "reranker.gguf"\n'
+        "ctx = 4096\n",
+        encoding="utf-8",
+    )
+    cfg = load(toml)
+    assert cfg.engine.reranker_model.path == "reranker.gguf"
+    assert cfg.engine.reranker_model.ctx == 4096
+
+
 def test_load_reads_server_and_generation_fields(tmp_path):
     toml = tmp_path / "leyllana.toml"
     toml.write_text(
