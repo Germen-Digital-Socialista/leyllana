@@ -185,8 +185,8 @@ agreed; none is built. Ordered roughly by dependency.
    `python-docx`. Changes PRD FR-8 ("Save the explanation as Markdown"), so it
    needs its own ADR. The existing GUI/CLI byte-parity test must keep passing on
    the Markdown path.
-2. **Per-`nivel` output templates.** The `nivel` fix (ADR 0023) moved the register
-   into the prompt, but a prompt only asks. Consistency should be enforced by a
+2. **Per-`nivel` output templates.** The `nivel` fix (commit `afac933`; **its ADR is
+   not written yet**) moved the register into the prompt, but a prompt only asks. Consistency should be enforced by a
    render template per level rather than by the model's cooperation — which is
    exactly what failed before. Design not settled: a per-level Markdown render
    template is inside ADR 0007; extending the output contract with extra fields
@@ -417,7 +417,7 @@ producing **confident fiction** on a long norm, twice, exiting 0 both times.
   decrees. The closest published analogue to what leyllana does, usable as an eval
   set despite being Spain's BOE.
 
-### What a Chilean technical reading contains (fed ADR 0023)
+### What a Chilean technical reading contains (fed the `nivel` fix, `afac933`)
 
 Research behind the `nivel` rework. BCN already publishes both of our registers:
 **Ley Fácil** (since 2003, OECD-cited, RAE calls it pioneering in Hispanoamérica)
