@@ -49,7 +49,10 @@ source-id -> local Qwen3 -> four sections), both single-pass and chunked.
   URL, consultation date) when extractable, never invented (FR-7.1); captured in
   the same fetch that reads the text.
 - **Map-reduce on the 4B default: measured.** Ley 21.663 (99.468 caracteres, 55
-  articulos) via 13 fragmentos, GPU: **50 min**, sin inventar nada. Las
+  articulos) via 13 fragmentos: **50 min**, sin inventar nada. (Decia "GPU"; el
+  2026-07-29 se comprobo que el binario de `backend/bin` no tiene ningun backend de
+  GPU, asi que esta corrida fue en CPU como todas las anteriores. Ver el hallazgo
+  del build mas abajo.) Las
   comprobaciones puntuales contra la fuente pasan (articulo 53, articulo 4 y la
   facultad de la Agencia, el tramo de 5.000 a 40.000 UTM). Dos hallazgos:
   - La lectura es mas delgada que la de un proveedor de nube en una sola pasada:
@@ -198,17 +201,118 @@ agreed; none is built. Ordered roughly by dependency.
    fiction on a long norm, twice, exiting 0. Offering that switch would deliver
    invention faster, against the project's central promise. Either the fallback is
    replaced with something tested first (see the model findings below), or the
-   offer is limited to wait/cancel until then. **Do not design this before item 6
-   is measured.** If a higher `ctx` cuts the run enough, the ten-minute threshold
-   is never reached and the escalation is not needed at all — that measurement
-   can delete this item rather than inform it.
+   offer is limited to wait/cancel until then. **Item 6 is now measured, and it
+   halves this item rather than deleting it.** On a GPU-capable build at
+   `ctx 16384` the run is 4,8 min, so the ten-minute threshold is never reached and
+   no escalation is needed on that path. On CPU no configuration gets under ten
+   minutes, so the item survives there in full — and the conflict above survives
+   with it, because the only smaller model we ship is the one that emitted fiction
+   twice. What changed is the scope: this is a CPU-path feature, not a general one.
 5. **Preview the loaded document before running.** The Archivo tab shows only a
    path, so the user cannot tell whether extraction actually worked — which
    matters most exactly when it silently did not, i.e. a scanned PDF that went
    through OCR (FR-1.1). Show the first extracted characters so the input can be
    eyeballed before a 30-minute run starts.
-6. **Raise `ctx` and re-measure.** Gates two things, despite sitting last in this
-   list: any model swap, and the design of item 4. Measure first. See below.
+6. **Raise `ctx` and re-measure. Done, and the answer depends entirely on the
+   backend build.** Same law, same model, same document bytes, `nivel publico`,
+   end to end through `explain()`:
+
+   | build | `ctx` | model calls | total |
+   |---|---|---|---|
+   | GPU (Vulkan) | 4096 | 25 | **22,9 min** |
+   | GPU (Vulkan), `q8_0` KV | 16384 | 3 | **4,8 min** |
+
+   **A 4,8x cut, and the mechanism is not the one this list assumed.** The cost is
+   generation, not prompt processing: every map call runs to the `max_tokens = 1024`
+   ceiling, so the run costs roughly `calls x 1024 tokens`. What `ctx` controls is
+   the number of calls. At 4096 the pooled key points do not fit either, so the
+   hierarchical reduction of ADR 0017 fires three times (13 -> 6 -> 3 -> 2) for 25
+   calls; at 16384 there are 2 fragments and no reduction at all, for 3.
+   - **`ctx 16384` needs `q8_0` KV to exist on a 4 GiB card.** With f16 KV it dies
+     at startup: `ErrorOutOfDeviceMemory` allocating the 1 GiB KV buffer. Quantized
+     K and V halve that and the same run fits in 3498 MiB.
+   - **On CPU the lever is dead, and this was tested rather than assumed.** Prompt
+     throughput falls 84,7 -> 41,5 -> 25,9 tok/s and generation 11,4 -> 2,2 -> 1,0
+     tok/s as the context deepens, so a single pass over the whole law costs 961 s
+     of prompt processing before it emits a token. A larger physical batch, the
+     documented remedy, makes it *worse* here (`-ub 2048`: 76,1 and 34,9 tok/s),
+     and forcing `-fa on` changes nothing useful.
+   - **The reading got better, not just faster.** At 16384 the output cites six
+     articles against four, and recovers exactly what Phase 1 recorded the local
+     path as missing: the reporting deadlines of Articulo 9. All four were checked
+     against the source and are real (`tres horas`, `setenta y dos horas`,
+     `veinticuatro horas`, `quince dias corridos`). Nothing invented in either run,
+     and the lost-identifier artefact did not recur in either.
+   - **Countable progress survives**, which FR-10 needs: 2 fragments is still a
+     countable map loop, not a single opaque pass.
+   - Adopting any of this changes ADR 0012 (GPU), ADR 0015 (model/ctx) and ADR 0016
+     (server binary), so **nothing has been changed in the repo or the config.**
+
+## Found while measuring item 6, 2026-07-29
+**Status: recorded, nothing fixed, no decision taken**
+
+Three findings that were not the object of the measurement. None is fixed; each
+would need its own decision.
+
+- **A plausible BCN URL silently fetches an error page instead of the law.**
+  `_bcn_id_norma` (`input/url.py`) only recognises an `idNorma` query key, but BCN
+  itself also serves `?i=1202434`. That form misses the XML path, falls through to
+  the generic HTML scraper, and yields **189 characters** of
+  *"Este proceso demora demasiado, es probable que su conexion este muy lenta o que
+  su navegador no sea compatible"* against 99.468 for the same law, with no title.
+  `validate_text` passes it, because `_MIN_USABLE_CHARS = 20`. FR-1.1 promises to
+  detect incomplete extraction and warn; this is that case and it is not detected.
+  - **The guardrail catches what the input layer missed, and this was verified end
+    to end.** Run on those 189 characters the tool answers *"No hay una norma o ley
+    explicada en el texto proporcionado"* and puts the exact
+    *"No se puede determinar a partir del texto entregado."* string in two sections.
+    It invents nothing. So the consequence is a confusing run, not a false
+    explanation — ADR 0008 doing its job on a degenerate input.
+- **Digits-for-words weakens the traceability of FR-6.1 / ADR 0014.** The source
+  writes `tres horas` and `setenta y dos horas`; the output writes `3 horas` and
+  `72 horas`. Both are faithful in substance, but ADR 0014 requires the identifier
+  *as it appears* precisely so a reader can text-match it against the source, and a
+  reader searching the law for "3 horas" finds nothing. Found by trying to verify
+  the citations by text match and failing on the first attempt.
+- **An oversized prompt fails loudly, which is better than feared.** At
+  `_MAX_REDUCE_DEPTH` (`engine/__init__.py`) `_condense` returns the pooled points
+  without re-checking that they fit. That looked like a silent-truncation risk, but
+  `llama-server` rejects an oversized request with HTTP 400
+  (`exceed_context_size_error`, `truncated = 0`) rather than quietly cutting it, so
+  the failure surfaces as a `ProviderError` instead of a plausible wrong answer.
+
+## The binary in `backend/bin` is a CPU-only build. Found 2026-07-29
+**Status: recorded, nothing changed**
+
+**The GPU has never been used by this project, on any run.** `backend/bin` contains
+no `ggml-cuda.dll`, no `ggml-vulkan.dll`, no GPU backend of any kind, and
+`llama-server --list-devices` (build b9929) prints an empty list. Meanwhile
+`engine.gpu = "auto"` resolves through `resolve_gpu_layers`, which probes for
+`nvidia-smi`, finds it, and passes `-ngl 999` into a binary that cannot honour it.
+No error, no warning: the config claims a GPU path that does not exist. ADR 0012's
+optional-GPU promise is currently unimplementable with what we ship.
+
+Every figure previously recorded in this file as "GPU" was produced on the CPU.
+
+A GPU-capable build already exists on this machine, shipped by Docker Model Runner
+(`~/.docker/bin/inference`, with `ggml-vulkan.dll`); it reports
+`Vulkan0: NVIDIA GeForce RTX 2050 (3962 MiB, 3367 MiB free)`. Same model, same
+prompt, same `ctx`:
+
+| | shipped build (CPU-only) | Vulkan build |
+|---|---|---|
+| Prompt processing, 2152 tok | 84,7 tok/s | **1278,1 tok/s** |
+| Generation | 11,4 tok/s | **35,3 tok/s** |
+
+The Vulkan build pays a one-time shader-pipeline compilation on its first run
+(~27 s, measured cold then warm); after that it is warm. Official llama.cpp Windows
+prebuilts have shipped CUDA, Vulkan, HIP and SYCL variants since b9196, so this is a
+download rather than a compile, and llama.cpp issue #24744 records that `llama
+update` on Windows can silently replace a CUDA build with a Vulkan or CPU one, which
+is a plausible account of how `backend/bin` ended up this way.
+
+**Nothing has been swapped.** Which backend leyllana ships is an ADR 0012 / ADR 0016
+decision, and it reaches the Phase 4 installer.
 
 ## Local model options — research findings, 2026-07-29
 **Status: recorded, nothing decided**
@@ -219,23 +323,60 @@ adopted.** Any change needs its own ADR and a faithfulness test on a real norm.
 
 ### Measured on this machine, not estimated
 
-| | GPU (RTX-class desktop) | CPU-only, same desktop |
+| | shipped CPU build | Vulkan build |
 |---|---|---|
-| One map fragment, Qwen3-4B Q4_K_M | — | **138 s** (~7.4 tok/s) |
-| ~105k chars at `ctx = 4096` → 13 fragments | ~2 min | **~32 min** (extrapolated from 2 measured calls) |
+| One map fragment, Qwen3-4B Q4_K_M | **138 s** (~7,4 tok/s) | **57 s** mean over 25 calls |
+| 99.468 chars at `ctx = 4096` | ~32 min (extrapolated) | **22,9 min** (measured end to end) |
+| 99.468 chars at `ctx = 16384`, `q8_0` KV | not run | **4,8 min** (measured end to end) |
 
-Cold start on CPU adds ~3 s over a warm call, so the cost is almost entirely
-generation, and it is roughly linear in `fragmentos × max_tokens`. **A laptop
-without a GPU is the real target and is slower than the 32 minutes above.**
+Cold start adds ~3 s over a warm call, so the cost is almost entirely generation and
+is roughly linear in `calls × max_tokens`. **A laptop without a GPU is the real
+target** and, on the numbers above, has no configuration that brings a long norm
+under ten minutes.
+
+An earlier `~2 min` figure for this law appeared in this table and **has not been
+reproduced**. Three explanations were tested and ruled out: the GPU build alone
+(22,9 min), silent prompt truncation before ADR 0017 (the server refuses with HTTP
+400 and `truncated = 0`, it does not truncate), and a short-fetch input (13 s, and
+the output correctly says there is no norm in the text). It is left recorded as
+unexplained rather than deleted.
 
 ### The cheapest lever is our own config, not a new model
 
 `ctx = 4096` in `leyllana.toml` is what splits a 99k-character law into 13
-sequential passes. Qwen3-4B supports far more. Fewer fragments means less time
-*and* fewer map-reduce artefacts — the lost article identifier recorded in Phase 1
-was a reduction artefact. **Untested: raise `ctx` and re-measure before touching
-models.** On CPU this trades many short passes for one long prompt-processing
-pass, so it is not automatically a win and has to be measured.
+sequential passes, and then into 25 model calls once hierarchical reduction fires.
+The default model is **Qwen3-4B-Instruct-2507, whose native context is 262.144
+tokens**, so 4096 is 1/64 of what it supports and is not a property of the model.
+**Now measured, see item 6 of the queue:** on the Vulkan build, `ctx 16384` with
+`q8_0` KV cuts the run 4,8x and improves the reading; on CPU the lever is dead. The
+whole law is 24.905 real tokens, so a single pass needs `ctx >= 26k`, which does not
+fit a 4 GiB card at any KV quantization — and the research below argues against
+wanting it anyway.
+
+### Against chasing a single pass, on faithfulness grounds
+
+This file previously assumed that fewer fragments would mean fewer artefacts, so a
+single pass over the whole law would be the faithful ideal. **The published evidence
+points the other way**, which matters more here than the timing does.
+
+Long-context models show a U-shaped positional bias — the "lost in the middle"
+effect — where accuracy is highest for material at the start and end of the context
+and degrades by more than 30% for material in the middle, driven by RoPE long-term
+decay reducing attention to distant token pairs. A comparative study of chunked
+map-reduce against stuffing the whole document found the map approach **at least as
+accurate**, and specifically better at retaining facts from the beginning and middle
+of the text.
+
+For a 55-article law that is the whole ballgame: a single pass puts the middle of the
+articulado exactly where models drop things. **So ADR 0017's chunking is defensible
+on faithfulness grounds and not merely a workaround for a small context**, and the
+lost article identifier of Phase 1 is a reduce-prompt problem to fix in the prompt,
+not an argument for abandoning chunking. The measured runs are consistent with the
+positional story: at `ctx 4096` (25 calls, three reduction levels) the output cited
+Articulos 4, 5, 39 and 40 — the two ends — while at `ctx 16384` (2 calls, no
+reduction) it cited 4, 7, 8, 9, 10 and 24, a contiguous run through the obligations
+block, and dropped the sanctions at the end. Fewer calls read more deeply but not
+more widely.
 
 ### Latin-America-centric candidates
 
