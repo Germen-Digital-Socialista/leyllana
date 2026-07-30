@@ -768,6 +768,26 @@ conversation — and on the evidence above, that ADR's central question may
 now be "is Qwen3-1.7B usable as a fallback at all," not "which binary to
 ship."
 
+## Gemma 3 1B tried as a replacement for the low-RAM slot, 2026-07-30
+**Status: recorded, first attempt failed, nothing decided**
+
+Given the low-RAM model's faithfulness looked unpredictable rather than fixable
+(section above), tried the candidate ROADMAP had already researched: Gemma 3 1B
+(`ggml-org/gemma-3-1b-it-GGUF`, `Q4_K_M`), same document, same `ctx = 4096`,
+b10184 native Windows.
+
+**Failed outright, not on faithfulness — on output format.** The response never
+produced the required "en una frase" section, so `explain()`'s own parser
+correctly rejected it (`ParseError: La respuesta del modelo no trae las
+secciones: en una frase`) rather than passing through malformed output. Also
+needed 18 map calls (two hierarchical reduction rounds Qwen3-1.7B never
+triggered) and took 6,9 min — slower than Qwen3-1.7B's ~3 min on the same
+binary. One attempt, not repeated; the raw failed response was not captured
+(`measure_run.py` only saves the parsed result, which does not exist on this
+kind of failure). Nothing concluded about Gemma 3 1B from a single failed run
+beyond "the current prompt/output contract does not reliably work with it
+out of the box."
+
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
 
