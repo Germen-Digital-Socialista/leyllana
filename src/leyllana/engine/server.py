@@ -155,6 +155,33 @@ def chat_completion(
     return "".join(partes)
 
 
+def rerank(
+    base_url: str, query: str, documents: list[str], *, timeout: float = _REQUEST_TIMEOUT
+) -> list[float]:
+    """Llama ``/v1/rerank`` (llama-server, modelo cross-encoder) y devuelve un
+    puntaje por documento, en el MISMO ORDEN en que se paso ``documents``.
+
+    A diferencia de ``chat_completion``, no es streaming: el reranker devuelve un
+    JSON de una vez, no un flujo SSE token a token.
+    """
+    payload = {"query": query, "documents": documents}
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base_url}/v1/rerank",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            obj = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise ProviderError(f"Fallo la llamada al reranker: {exc}") from exc
+
+    by_index = {r["index"]: r["relevance_score"] for r in obj.get("results", [])}
+    return [by_index[i] for i in range(len(documents))]
+
+
 class LlamaServer:
     """Un ``llama-server`` gestionado: arranca bajo demanda y se detiene al salir."""
 
@@ -166,12 +193,14 @@ class LlamaServer:
         ctx: int,
         gpu: str,
         threads: int,
+        extra_args: tuple[str, ...] = (),
     ) -> None:
         self._binary = Path(binary_path)
         self._model = Path(model_path)
         self._ctx = ctx
         self._gpu = gpu
         self._threads = threads
+        self._extra_args = extra_args
         self._proc: subprocess.Popen | None = None
         self._base: str | None = None
         self._lock = threading.Lock()
@@ -199,6 +228,7 @@ class LlamaServer:
                 "-c", str(self._ctx),
                 "-ngl", str(resolve_gpu_layers(self._gpu)),
                 "--jinja",
+                *self._extra_args,
             ]
             if self._threads > 0:
                 args += ["-t", str(self._threads)]
@@ -262,4 +292,4 @@ class LlamaServer:
             self._log = None
 
 
-__all__ = ["LlamaServer", "chat_completion", "resolve_gpu_layers"]
+__all__ = ["LlamaServer", "chat_completion", "rerank", "resolve_gpu_layers"]

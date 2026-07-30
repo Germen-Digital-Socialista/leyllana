@@ -5,6 +5,7 @@ que estos tests corren sin binario ni modelo. El arranque real del servidor se
 prueba aparte (test_engine_smoke.py), gated a la presencia de binario+modelo.
 """
 
+import json
 import urllib.error
 
 import pytest
@@ -119,6 +120,91 @@ def test_server_missing_model_raises(tmp_path):
     )
     with pytest.raises(ProviderError):
         srv.ensure()
+
+
+def test_ensure_appends_extra_args(monkeypatch, tmp_path):
+    binary = tmp_path / "llama-server.exe"
+    binary.write_text("x")
+    model = tmp_path / "m.gguf"
+    model.write_text("x")
+    captured = {}
+
+    class FakeProc:
+        def poll(self):
+            return None
+
+    def fake_popen(args, **kwargs):
+        captured["args"] = args
+        return FakeProc()
+
+    monkeypatch.setattr(server_mod.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(server_mod.LlamaServer, "_wait_healthy", lambda self, timeout=180.0: None)
+
+    srv = server_mod.LlamaServer(
+        str(binary), str(model), ctx=2048, gpu="cpu", threads=0,
+        extra_args=("--reranking", "--pooling", "rank"),
+    )
+    srv.ensure()
+    assert captured["args"][-3:] == ["--reranking", "--pooling", "rank"]
+
+
+def test_ensure_without_extra_args_unchanged(monkeypatch, tmp_path):
+    # Los llamadores existentes (LocalProvider) no pasan extra_args: el argv no
+    # debe cambiar para ellos.
+    binary = tmp_path / "llama-server.exe"
+    binary.write_text("x")
+    model = tmp_path / "m.gguf"
+    model.write_text("x")
+    captured = {}
+
+    class FakeProc:
+        def poll(self):
+            return None
+
+    def fake_popen(args, **kwargs):
+        captured["args"] = args
+        return FakeProc()
+
+    monkeypatch.setattr(server_mod.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(server_mod.LlamaServer, "_wait_healthy", lambda self, timeout=180.0: None)
+
+    srv = server_mod.LlamaServer(str(binary), str(model), ctx=2048, gpu="cpu", threads=0)
+    srv.ensure()
+    assert captured["args"][-1] == "--jinja"
+
+
+def test_rerank_returns_scores_in_input_order(monkeypatch):
+    payload = {
+        "results": [
+            {"index": 1, "relevance_score": 0.9},
+            {"index": 0, "relevance_score": 0.2},
+        ]
+    }
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return json.dumps(payload).encode("utf-8")
+
+    monkeypatch.setattr(
+        server_mod.urllib.request, "urlopen", lambda req, timeout=None: FakeResponse()
+    )
+    scores = server_mod.rerank("http://fake", "query", ["doc a", "doc b"])
+    assert scores == [0.2, 0.9]
+
+
+def test_rerank_wraps_network_errors(monkeypatch):
+    def boom(req, timeout=None):
+        raise urllib.error.URLError("caido")
+
+    monkeypatch.setattr(server_mod.urllib.request, "urlopen", boom)
+    with pytest.raises(ProviderError, match="reranker"):
+        server_mod.rerank("http://fake", "q", ["a"])
 
 
 def test_explain_local_end_to_end_parsed(monkeypatch):
