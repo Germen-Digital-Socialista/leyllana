@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import re
 
+from ..types import ArticleChunk
+
 # Estimacion conservadora de tokens desde caracteres (espanol, ~3.5 chars/token).
 _CHARS_PER_TOKEN = 3.5
 
@@ -52,6 +54,23 @@ def _segments(text: str) -> list[str]:
     return [text[a:b] for a, b in zip(bounds, bounds[1:], strict=False) if text[a:b]]
 
 
+def split_by_article(text: str) -> list[ArticleChunk]:
+    """Devuelve un ``ArticleChunk`` por cada marcador estructural de ``text``.
+
+    El preambulo antes del primer marcador (titulo de la ley, encabezado) no es un
+    articulo direccionable y se descarta: no tiene sentido rankearlo ni citarlo como
+    "articulo clave". Si ``text`` no tiene ningun marcador, devuelve una lista vacia.
+    """
+    chunks: list[ArticleChunk] = []
+    for seg in _segments(text):
+        stripped = seg.lstrip()
+        if not _STRUCTURE_RE.match(stripped):
+            continue
+        label = stripped.splitlines()[0].strip()
+        chunks.append(ArticleChunk(label=label, text=seg))
+    return chunks
+
+
 def split_structural(
     text: str, *, max_chars: int, overlap: int = _DEFAULT_OVERLAP
 ) -> list[str]:
@@ -83,4 +102,4 @@ def split_structural(
     return chunks
 
 
-__all__ = ["estimate_tokens", "chars_for_tokens", "split_structural"]
+__all__ = ["ArticleChunk", "estimate_tokens", "chars_for_tokens", "split_by_article", "split_structural"]

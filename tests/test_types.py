@@ -1,4 +1,10 @@
-from leyllana.types import DISCLAIMER, Explanation, Nivel, SourceInfo
+from leyllana.types import DISCLAIMER, ArticleChunk, Explanation, Nivel, SourceInfo
+
+
+def test_article_chunk_is_frozen():
+    chunk = ArticleChunk(label="Articulo 1", text="Articulo 1. Texto.")
+    assert chunk.label == "Articulo 1"
+    assert chunk.text == "Articulo 1. Texto."
 
 
 def test_explanation_markdown_has_four_sections_and_disclaimer():

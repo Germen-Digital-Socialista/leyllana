@@ -4,7 +4,35 @@ Funciones puras: sin modelo ni red. Cubren la estimacion de tokens, el corte por
 limites de la ley chilena (Articulo/Titulo/Capitulo) y el fallback por tamano.
 """
 
-from leyllana.engine.chunking import estimate_tokens, split_structural
+from leyllana.engine.chunking import ArticleChunk, estimate_tokens, split_by_article, split_structural
+
+
+def test_split_by_article_one_chunk_per_articulo():
+    text = (
+        "Articulo 1. Texto uno.\n"
+        "Articulo 2. Texto dos.\n"
+        "Articulo 3. Texto tres.\n"
+    )
+    chunks = split_by_article(text)
+    assert len(chunks) == 3
+    assert all(isinstance(c, ArticleChunk) for c in chunks)
+    assert chunks[0].label.lower().startswith("articulo 1")
+    assert chunks[1].label.lower().startswith("articulo 2")
+    assert "Texto uno." in chunks[0].text
+
+
+def test_split_by_article_skips_preamble():
+    # El preambulo (titulo de la ley antes del primer Articulo) no es un articulo
+    # direccionable: no debe aparecer como su propio ArticleChunk.
+    text = "Ley 21.663 sobre ciberseguridad.\nArticulo 1. Objeto de la ley.\n"
+    chunks = split_by_article(text)
+    assert len(chunks) == 1
+    assert "Ley 21.663" not in chunks[0].text
+
+
+def test_split_by_article_no_markers_returns_empty():
+    chunks = split_by_article("texto sin estructura ni articulos")
+    assert chunks == []
 
 
 def test_estimate_tokens_scales_with_length():

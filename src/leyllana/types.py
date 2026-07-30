@@ -26,6 +26,22 @@ class Nivel(StrEnum):
 
 
 @dataclass(frozen=True)
+class ArticleChunk:
+    """Un articulo (u otro marcador estructural) con su etiqueta, para trazabilidad.
+
+    A diferencia de los trozos de ``chunking.split_structural``, cada ``ArticleChunk``
+    es exactamente un marcador, sin agrupar varios juntos: el ranking
+    (engine/ranking.py) necesita poder puntuar y citar cada articulo por separado.
+    Vive aqui (no en engine/chunking.py) porque tanto ``engine`` como ``prompt`` lo
+    necesitan, y ``engine/__init__.py`` ya importa de ``prompt`` -- ponerlo en
+    ``engine.chunking`` habria armado un ciclo de imports.
+    """
+
+    label: str
+    text: str
+
+
+@dataclass(frozen=True)
 class Explanation:
     """Salida estructurada: cuatro secciones fijas + disclaimer (ADR 0007)."""
 
