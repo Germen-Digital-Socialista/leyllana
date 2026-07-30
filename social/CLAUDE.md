@@ -63,6 +63,38 @@ web research, not assumed:
 
 Sources: [Instagram Post Size Guide 2026 — Buffer](https://buffer.com/resources/instagram-image-size/), [Instagram media specs & best practices 2026 — HeyOrca](https://www.heyorca.com/blog/instagram-media-specs-best-practices-2026), [WhatsApp image compression — DEV Community](https://dev.to/samma1997/whatsapp-image-quality-loss-fix-it-before-sending-2026-223), [How to send photos as Document on WhatsApp — Mobitrix](https://www.mobitrix.com/whatsapp/how-to-send-photos-as-document-in-whatsapp.html), [PNG vs JPEG for text/screenshots — Reformatly](https://reformatly.com/resources/png-vs-jpeg-quality), [Instagram sRGB/color profile requirements — colormanagement.guide](https://colormanagement.guide/en/troubleshooting/instagram-colors-changed/)
 
+## HARD RULE: never a carousel unless explicitly asked for one
+
+**Default to a single image. Only build a carousel (multiple slides) when
+Felipe explicitly asks for one.** The research below on carousels outperforming
+single images is still true and still worth knowing, but it does not license
+defaulting to a carousel on its own — that default was corrected 2026-07-30
+after building one unprompted. When Felipe asks for "an image" or "a post,"
+that means **one file**, designed to also work standalone as a WhatsApp share
+(see the next section), not one slide of a set.
+
+## Single-image design, when multiple points must fit in one file, researched 2026-07-30
+
+- **Canvas: 1080x1350 (4:5).** Confirmed as the cross-platform sweet spot —
+  displays natively in the Instagram feed and doesn't get an awkward
+  WhatsApp crop (WhatsApp's own rule of thumb: avoid a side more than 2x the
+  other; 4:5 is nowhere near that).
+- **One dominant idea still leads, even in a multi-point image.** Use a
+  three-level poster hierarchy: (1) one large, boldest headline/hook — the
+  single thing a 1-second glance should take away, (2) 3-7 short supporting
+  points max, each one bold short line, not a paragraph, (3) a credit/detail
+  line at the bottom. If the content doesn't reduce to one sentence plus a
+  handful of short lines, it's carousel material, not single-image material
+  — flag that trade-off to Felipe rather than cramming it in.
+- **Keep the bottom ~15-20% clear or low-priority** (credit line, logo) —
+  this is both the safe zone convention and where a WhatsApp-shared image's
+  UI chrome tends to sit.
+- Same font-size floor as the carousel research (24-30pt final export size),
+  same high-contrast/bold-sans-serif guidance, same "send as WhatsApp
+  Document, not Photo" caveat for preserving PNG crispness.
+
+Sources: [Single Instagram image vs carousel — usevisuals](https://usevisuals.com/blog/instagram-carousel-post-best-practices), [Poster design hierarchy — madegooddesigns](https://madegooddesigns.com/poster-design-principles/), [List design for single images — UXPin](https://www.uxpin.com/studio/blog/list-design/), [Cross-platform image sizing incl. WhatsApp — SocialPilot](https://www.socialpilot.co/blog/social-media-image-sizes)
+
 ## A dense one-pager is the wrong shape for Instagram/WhatsApp, researched 2026-07-30
 
 **A single image carrying a whole one-pager's worth of text is not an
