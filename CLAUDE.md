@@ -67,6 +67,12 @@ These apply to all work here, exactly as they do across Felipe's repos:
 
 ## Working conventions
 
+- **HARD RULE: token counts are a latency metric here, not a cost metric.**
+  The default engine is local and free (ADR 0005) — "saving tokens" never
+  means saving money, it means saving wall-clock time and context-window
+  headroom. Frame every token-efficiency discussion, measurement, or design
+  decision in this project in those terms (seconds/minutes, calls, context
+  fit), never as a dollar-cost saving. Set 2026-07-30.
 - All user-facing text and model output is in **Spanish**.
 - Default engine is local `llama.cpp` (light Qwen-class model, CPU-only), the
   same approach used in the MuniGPT project. Cloud providers (Claude, OpenAI/
