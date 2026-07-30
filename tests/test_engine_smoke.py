@@ -47,3 +47,36 @@ def test_local_provider_real_generation():
     assert exp.a_quien_afecta.strip()
     assert exp.articulos_clave.strip()
     assert exp.en_una_frase.strip()
+
+
+_RERANKER_SERVER = os.environ.get("LEYLLANA_SMOKE_RERANKER_SERVER")
+_RERANKER_MODEL = os.environ.get("LEYLLANA_SMOKE_RERANKER_MODEL")
+_RERANKER_READY = bool(
+    _RERANKER_SERVER
+    and _RERANKER_MODEL
+    and Path(_RERANKER_SERVER).exists()
+    and Path(_RERANKER_MODEL).exists()
+)
+
+
+@pytest.mark.skipif(
+    not _RERANKER_READY,
+    reason="defina LEYLLANA_SMOKE_RERANKER_SERVER y LEYLLANA_SMOKE_RERANKER_MODEL",
+)
+def test_reranker_real_rerank_call():
+    from leyllana.engine.chunking import ArticleChunk
+    from leyllana.engine.ranking import RerankerClient
+
+    client = RerankerClient(_RERANKER_SERVER, _RERANKER_MODEL, ctx=2048)
+    try:
+        chunks = [
+            ArticleChunk(label="Articulo 1", text="Articulo 1. Definiciones generales."),
+            ArticleChunk(
+                label="Articulo 2",
+                text="Articulo 2. El infractor pagara una multa de hasta 500 UTM.",
+            ),
+        ]
+        ranked = client.rank(chunks, "multa sancion")
+        assert ranked[0].label == "Articulo 2"
+    finally:
+        client.close()
