@@ -45,3 +45,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Salidas de la instrumentacion de desarrollo (tools/), nunca versionadas.
+mediciones/
