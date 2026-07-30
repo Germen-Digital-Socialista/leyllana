@@ -13,6 +13,23 @@ a generic role.
 
 ---
 
+## Next step (as of 2026-07-30)
+
+The BM25/reranker article-selection mechanism is implemented and tested (see "Article
+selection (BM25 + reranker) implemented, 2026-07-30" below), but not yet run for real. To
+actually find out whether it fixes anything:
+
+1. Get a real **Qwen3-Reranker-0.6B** GGUF (download, verify license/source — same
+   due-diligence pattern as every other model choice here).
+2. Point `engine.models.reranker` at it in `leyllana.toml`.
+3. Run `explain()` on a real law at `nivel publico` with **Qwen3-1.7B** as the fallback
+   model (not Gemma — model-agnostic validation first, per the earlier decision) and check
+   whether the "Articulos clave" selection is faithful and the fabrication problem is gone.
+4. Only after that: decide whether this changes what ADR 0025 (the Gemma swap) needs to
+   decide.
+
+---
+
 ## Phase 0 — Foundation and decisions
 **Status: Done**
 
