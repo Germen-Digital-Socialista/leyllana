@@ -325,9 +325,20 @@ adopted.** Any change needs its own ADR and a faithfulness test on a real norm.
 
 | | shipped CPU build | Vulkan build |
 |---|---|---|
-| One map fragment, Qwen3-4B Q4_K_M | **138 s** (~7,4 tok/s) | **57 s** mean over 25 calls |
-| 99.468 chars at `ctx = 4096` | ~32 min (extrapolated) | **22,9 min** (measured end to end) |
-| 99.468 chars at `ctx = 16384`, `q8_0` KV | not run | **4,8 min** (measured end to end) |
+| One map fragment, Qwen3-4B Q4_K_M | **134 s** mean over 27 calls | **57 s** mean over 25 calls |
+| ~100k chars at `ctx = 4096` | **59,6 min** (measured end to end) | **22,9 min** (measured end to end) |
+| ~100k chars at `ctx = 16384`, `q8_0` KV | not run (needs a config key for `-ctk`) | **4,8 min** (measured end to end) |
+
+The CPU figure is the **as-shipped baseline**, measured 2026-07-29 in the GUI with
+nothing changed, on Ley 21.663 as a PDF from the desktop (103.666 caracteres after
+extraction, slightly more than the 99.468 the BCN XML gives): **59,6 min in 28 model
+calls**, with rounds of `14 -> 7 -> 4 -> 2` fragments. It used all three levels of
+reduction that `_MAX_REDUCE_DEPTH` allows. This is what a user gets today, and it is
+the number that replaces the previously mislabelled one.
+
+Note how little the reduction reduces: 14 fragments condense to 7, then to 4, then to
+2. Each round costs nearly as much as the one before, which is how a single law
+becomes 28 calls. The rounds, not the law, are the cost.
 
 Cold start adds ~3 s over a warm call, so the cost is almost entirely generation and
 is roughly linear in `calls × max_tokens`. **A laptop without a GPU is the real
