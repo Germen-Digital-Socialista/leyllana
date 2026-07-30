@@ -334,12 +334,17 @@ is roughly linear in `calls × max_tokens`. **A laptop without a GPU is the real
 target** and, on the numbers above, has no configuration that brings a long norm
 under ten minutes.
 
-An earlier `~2 min` figure for this law appeared in this table and **has not been
-reproduced**. Three explanations were tested and ruled out: the GPU build alone
-(22,9 min), silent prompt truncation before ADR 0017 (the server refuses with HTTP
-400 and `truncated = 0`, it does not truncate), and a short-fetch input (13 s, and
-the output correctly says there is no norm in the text). It is left recorded as
-unexplained rather than deleted.
+An earlier `~2 min` figure appeared in this table attributed to this law. **Explained
+2026-07-29 by the first run through the new diagnostics** (`leyllana.diagnostics`):
+it was a different norm. Ley 21.828 as a PDF is **3.239 caracteres**, thirty times
+smaller, so it fits `ctx 4096` in a single pass with **zero map calls** and finishes
+in **50,3 s** on the CPU build. Nothing was wrong with either number; they are
+different documents.
+
+Which is the whole lesson of this section: **the cost of a run is the number of model
+calls, not the size of the document**, and a figure recorded without the document
+size and call count beside it cannot be compared to anything. That is why the run
+record now writes both.
 
 ### The cheapest lever is our own config, not a new model
 
