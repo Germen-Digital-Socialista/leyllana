@@ -13,3 +13,15 @@ meant to be read/printed) or PNG (a single image, e.g. for a social post) and
 commit only that output. Do not leave the HTML source in this folder; if a
 build step needs one, keep it outside `social/` (scratchpad or a private
 build folder) and commit only the rendered result here.
+
+Before rendering: verify a one-pager is actually one page (count the PDF's
+page objects, or check the rendered image height) before calling it done.
+"One-pager" means one page, not approximately one page.
+
+## Voice pass order
+
+**For any prose written for this folder: run a humanizer pass first (the
+`article-humanizer` or `linkedin-humanizer` skill, whichever fits the content
+type), then `voz-de-felipe` as the final pass.** Humanizer first strips
+generic AI-writing patterns from the draft; `voz-de-felipe` then layers
+Felipe's actual voice on top as the last step before rendering.
