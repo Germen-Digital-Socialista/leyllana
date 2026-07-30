@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 from ..types import ArticleChunk, Nivel
 from .chunking import split_by_article
+from .server import LlamaServer, rerank
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 # Parametros BM25 estandar (Robertson/Sparck Jones); no medidos aun para este
@@ -98,6 +99,32 @@ def bm25_rank(chunks: list[ArticleChunk], query: str) -> list[ScoredArticle]:
     return sorted(scored, key=lambda s: s.score, reverse=True)
 
 
+class RerankerClient:
+    """Cliente del modelo re-rankeador: un ``LlamaServer`` separado en modo
+    ``--reranking``, siempre en CPU (el modelo es chico, ~0,6B; no vale la pena la
+    deteccion de GPU para esto)."""
+
+    def __init__(self, server_path: str, model_path: str, *, ctx: int = 2048) -> None:
+        self._server = LlamaServer(
+            server_path,
+            model_path,
+            ctx=ctx,
+            gpu="cpu",
+            threads=0,
+            extra_args=("--reranking", "--pooling", "rank"),
+        )
+
+    def rank(self, chunks: list[ArticleChunk], query: str) -> list[ArticleChunk]:
+        """Reordena ``chunks`` por relevancia contra ``query`` (mayor a menor)."""
+        base = self._server.ensure()
+        scores = rerank(base, query, [c.text for c in chunks])
+        pares = sorted(zip(chunks, scores, strict=True), key=lambda p: p[1], reverse=True)
+        return [chunk for chunk, _ in pares]
+
+    def close(self) -> None:
+        self._server.stop()
+
+
 def select_key_articles(
     text: str,
     nivel: Nivel,
@@ -127,4 +154,10 @@ def select_key_articles(
     return reranker.rank(shortlist, query)[:cap]
 
 
-__all__ = ["ScoredArticle", "bm25_rank", "query_for_nivel", "select_key_articles"]
+__all__ = [
+    "ScoredArticle",
+    "RerankerClient",
+    "bm25_rank",
+    "query_for_nivel",
+    "select_key_articles",
+]

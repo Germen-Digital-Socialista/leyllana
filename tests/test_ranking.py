@@ -6,7 +6,7 @@ juicio del modelo chico, asi que se prueba explicitamente.
 """
 
 from leyllana.engine.chunking import ArticleChunk
-from leyllana.engine.ranking import ScoredArticle, bm25_rank, select_key_articles
+from leyllana.engine.ranking import RerankerClient, ScoredArticle, bm25_rank, select_key_articles
 from leyllana.types import Nivel
 
 
@@ -65,3 +65,39 @@ def test_select_key_articles_tecnico_has_no_fixed_query_but_still_caps():
     text = "".join(f"Articulo {i}. x\n" for i in range(1, 10))
     result = select_key_articles(text, Nivel.TECNICO, cap=6)
     assert len(result) == 6
+
+
+def test_reranker_client_reorders_by_relevance_score(monkeypatch):
+    chunks = [
+        ArticleChunk(label="Articulo 1", text="poco relevante"),
+        ArticleChunk(label="Articulo 2", text="muy relevante"),
+    ]
+
+    class FakeServer:
+        def ensure(self):
+            return "http://fake"
+
+        def stop(self):
+            pass
+
+    client = RerankerClient("srv", "m.gguf", ctx=2048)
+    client._server = FakeServer()  # sustituye el LlamaServer real por uno falso
+
+    import leyllana.engine.ranking as ranking_mod
+
+    monkeypatch.setattr(ranking_mod, "rerank", lambda base, query, docs: [0.1, 0.9])
+    result = client.rank(chunks, "query")
+    assert [c.label for c in result] == ["Articulo 2", "Articulo 1"]
+
+
+def test_select_key_articles_uses_reranker_when_given():
+    partes = [f"Articulo {i}. relleno sin relevancia\n" for i in range(1, 10)]
+    text = "".join(partes)
+
+    class FakeReranker:
+        def rank(self, chunks, query):
+            # invierte el orden que BM25 hubiera dado, para probar que se usa
+            return list(reversed(chunks))
+
+    result = select_key_articles(text, Nivel.PUBLICO, reranker=FakeReranker(), cap=3)
+    assert len(result) == 3
