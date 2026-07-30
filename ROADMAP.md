@@ -723,15 +723,50 @@ contrast the Windows Qwen3-4B CPU runs, which did cite specific articles (4,
 fabrication: the content is faithful, but the traceability the section exists
 to provide is missing. Not fixed, not designed here.
 
+### Follow-up, same day: the build-version hypothesis does not survive testing
+
+Tried to isolate the b9929-vs-b10184 lead directly. Building b9929 from source
+inside WSL2 hit an unrelated, genuinely broken web-UI asset-bundling step in
+that historical release (`llama-ui-embed` rejecting the HF-hosted UI bundle
+for missing files, then rejecting hand-made placeholders for a different,
+dynamically-hashed set) — abandoned as a dead end unconnected to this
+question, not worth chasing further.
+
+Switched to a cleaner test: run the **exact existing binaries natively on
+Windows**, no WSL, no RAM cap, nothing else changed.
+
+| binary | platform | result |
+|---|---|---|
+| b9929 (`backend/bin`, same one Phase 1 used) | Windows native | **vacuous** — well-formed sections, zero real content ("los sujetos mencionados en el texto"), 3,4 min, matching Phase 1's recorded ~3 min almost exactly |
+| b10184 (official Windows CPU prebuilt, fresh download) | Windows native | **fabricated a different law entirely** — invented a data-protection/e-commerce statute with five fake article citations, 3,1 min |
+
+Combined with the two faithful WSL2 runs on b10184 above, that is **four
+outcomes across four attempts, no two alike, and they do not split cleanly by
+build version or by platform**: the same b10184 binary was faithful twice on
+WSL2 and fabricated once on native Windows. **The build-version hypothesis
+does not hold up — something else is driving this, unidentified.** Candidates
+not yet ruled out: genuine run-to-run variance (`temperature = 0,2`, not
+deterministic), floating-point/quantization-kernel differences between the
+Linux (GCC) and Windows (MSVC/Clang) builds, or something in how `threads = 0`
+resolves differently per platform. This reframes the finding: it is not "the
+low-RAM model needs a newer binary," it is **"the low-RAM model's
+faithfulness is not currently predictable run to run, on any binary tested
+so far."** That is a more serious problem than the one this thread started
+investigating, not a smaller one.
+
 ### Not yet done
 
-Only one model (Qwen3-1.7B), one ctx (4096), one document. Qwen3-4B under the
-same 8 GB cap, other ctx values, and — the actual open question behind all of
-this — figuring out why the build gap changed fabrication behaviour, are all
-still open. Felipe asked for this to become an ADR whose results steer the
-rest of the ADRs; per the project's rule that no ADR gets written without his
-decision first, the measurement is recorded here and the ADR itself waits on
-that conversation.
+Only one model (Qwen3-1.7B), one ctx (4096), one document, and now four
+inconsistent outcomes instead of an explained gap. Qwen3-4B under the same
+8 GB cap, other ctx values, a larger batch of repeated runs to characterize
+how often this model is faithful versus not (four runs is not enough to
+quote a rate), and actually explaining the variance are all still open.
+Felipe asked for this to become an ADR whose results steer the rest of the
+ADRs; per the project's rule that no ADR gets written without his decision
+first, the measurement is recorded here and the ADR itself waits on that
+conversation — and on the evidence above, that ADR's central question may
+now be "is Qwen3-1.7B usable as a fallback at all," not "which binary to
+ship."
 
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
