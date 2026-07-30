@@ -48,3 +48,6 @@ Thumbs.db
 
 # Salidas de la instrumentacion de desarrollo (tools/), nunca versionadas.
 mediciones/
+
+# Third-party Claude Code skills installed locally (project-scoped, not source).
+.claude/skills/

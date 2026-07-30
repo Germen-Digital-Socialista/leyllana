@@ -818,6 +818,13 @@ Ship something a non-technical user can install and run, then test it on real
 *boletines* with real readers.
 
 - Windows installer bundling the app + default model.
+- **Distribution site: `leyllana.cl`.** Landing/download page for the Windows installer
+  once it exists above; redirects from there to a separate site Felipe is building for his
+  own website/software-creation services (a distinct business, not part of leyllana or GDS).
+  The download site needs a fake, non-functional demo of the Windows GUI — leyllana is a
+  desktop app, not a web app, so it can't be tried live in a browser; visitors get a mocked
+  walkthrough of what running it looks like before downloading. Not started; the installer
+  above has to exist first for a download page to make sense.
 - Pilot with a small set of real laws/bills and target readers.
 - Faithfulness spot-check pass (output invents nothing vs. source).
 - **Decide here what to do about local speed on long norms.** Measured in Phase 1:
