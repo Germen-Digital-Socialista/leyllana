@@ -106,7 +106,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0012 | CPU baseline with optional GPU acceleration                    | Accepted (supersedes CPU-only part of 0003) |
 | 0013 | Explicit consent before sending content to a cloud provider    | Accepted |
 | 0014 | Traceability by verbatim citation                              | Accepted |
-| 0015 | Local model selection: Qwen3-4B default, Qwen3-1.7B fallback    | Accepted |
+| 0015 | Local model selection: Qwen3-4B default, Qwen3-1.7B fallback    | Accepted (fallback part superseded by 0025, its licensing criterion qualified by 0024) |
 | 0016 | Local llama.cpp runtime: managed llama-server subprocess        | Accepted |
 | 0017 | Long-document handling: structure-aware map-reduce              | Accepted |
 | 0018 | Subscription cloud providers driven as a headless CLI subprocess | Accepted (complements 0004, 0013) |
@@ -115,6 +115,8 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0021 | The GUI reads and writes `leyllana.toml`                        | Accepted |
 | 0022 | The terminal panel mirrors what the engine sends to the cloud   | Accepted |
 | 0023 | Vulkan `llama-server` build, and verifying the device            | Accepted (complements 0012, 0016) |
+| 0024 | License-bar exception for the low-RAM fallback slot only         | Accepted |
+| 0025 | Low-RAM fallback model: Gemma 3 1B replaces Qwen3-1.7B           | Accepted (supersedes fallback part of 0015; depends on 0024) |
 
 ## Further reading
 

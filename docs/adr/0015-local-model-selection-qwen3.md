@@ -1,6 +1,8 @@
 # 0015 — Local model selection: Qwen3-4B default, Qwen3-1.7B low-RAM fallback
 
-- **Status:** Accepted
+- **Status:** Accepted (fallback-model choice superseded by 0025; licensing
+  criterion for that same slot qualified by 0024 — the default-model decision
+  and its licensing criterion stand unchanged)
 - **Date:** 2026-07-23
 - **Deciders:** Felipe Carvajal Brown
 
