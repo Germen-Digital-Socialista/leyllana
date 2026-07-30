@@ -248,6 +248,82 @@ agreed; none is built. Ordered roughly by dependency.
    - Adopting any of this changes ADR 0012 (GPU), ADR 0015 (model/ctx) and ADR 0016
      (server binary), so **nothing has been changed in the repo or the config.**
 
+## Corpus retrieval and token cost — research findings, 2026-07-29
+**Status: recorded, nothing decided**
+
+Felipe's question: feed a local model via RAG or keywords so tokenization is faster,
+without handing it the whole corpus of Chilean law (his estimate, ~21.000 normas),
+"training it to find patterns that save tokens". Researched the same day. **Nothing
+here is adopted and none of it changes an ADR.**
+
+### Retrieval cuts tokens enormously, for a task we do not currently perform
+
+Measured in a published comparison: long-context prompting processed ~247.754 input
+tokens where keyword RAG used 8.569 and semantic RAG 8.399, roughly **29x fewer**.
+Another reports 93% fewer tokens and 92% lower latency. The 2026 consensus is not
+"RAG instead of long context" but hybrid: retrieve, then reason over what came back.
+
+**But retrieval does not speed up what leyllana does today.** It wins when most
+queries are answerable from a few thousand relevant tokens. "Explain this entire law
+in four sections" needs the whole law; there is nothing to retrieve away. So a
+retrieval layer is a **new capability** — asking questions across the corpus — and
+not an optimization of the pipeline that took 59,6 min. Worth keeping straight,
+because the two get conflated easily and only one of them is on the critical path.
+
+### The real levers on the current pipeline, in order of size
+
+1. **Fewer calls.** Item 6: `ctx 16384` turns 28 calls into 3, measured 4,8 min.
+2. **Prompt caching, which we are not using.** llama.cpp supports `cache_prompt` and
+   host-memory prompt caching: a shared prefix is not reprocessed. Our system prompt
+   is byte-identical across all 28 calls of a run and is re-tokenized every time.
+   Free, no quality risk, unexplored.
+3. **Prompt compression.** Felipe's instinct already exists as a technique:
+   **LLMLingua-2** is a small trained model that classifies which tokens to drop, at
+   2-5x compression and up to 2,9x lower latency; the original LLMLingua reports up
+   to 20x with minimal degradation.
+
+Caveat that reorders the list: our cost is **generation**, not prompt. Prompt work
+attacks the ~27 s of a call, not the ~107 s. Compression is third for that reason.
+
+### Two findings that touch decisions already made
+
+- **ADR 0017's structure-aware chunking is vindicated by outside work.** A study
+  chunking the German Civil Code compared structural units against fixed windows,
+  semantic clustering and RAPTOR: chunking aligned with the legal structure gives the
+  **highest recall**, and cleverer schemes that override it do worse, because those
+  boundaries were drawn by the lawmaker to delimit regulatory matter. That is the
+  argument ADR 0017 made from first principles.
+- **Retrieval would import a hallucination class we do not have.** Stanford's
+  empirical study found Lexis+ AI and Westlaw's AI research tools hallucinate
+  **17-33%** of the time; citation accuracy is the worst-performing task family across
+  frontier models at 12,4%. Grounding cuts hallucination 75-90% and is explicitly not
+  a cure. Today leyllana **cannot** invent a norm, because it only ever sees the one
+  it was given (ADR 0008). A corpus and an index spend that property. This is the same
+  objection already recorded under *Deliberately deferred*, now with numbers.
+
+### Feasibility, if it is ever built
+
+- Fully offline is realistic: `sqlite-vec` gives vector search in one file with no
+  server, embeddings can come from llama.cpp's own endpoint, and `bge-m3`,
+  `multilingual-e5` and `jina-v3` all cover Spanish.
+- **Keywords alone may be enough for a v1.** In a controlled ablation on legal passage
+  retrieval, dense retrieval beat BM25 by **0,3 percentage points**; hybrid beats
+  either by 10-30%. BM25 needs no embedding model and no second GGUF.
+- The corpus is published: `datos.bcn.cl` serves Ley Chile as open linked data with a
+  SPARQL endpoint and a *normas* dataset. **The ~21.000 figure is unverified** — the
+  total was not confirmed, and it should be counted before being quoted.
+- For the low-RAM slot that emitted fiction twice: **LegalDrill** distills legal
+  reasoning into small models and reports Qwen3-1.7B reaching near-teacher performance
+  against a Qwen3-30B teacher. A lead, not a plan.
+
+### Still to research: progressive display
+
+The second half of the question, not yet done: how to show something readable while a
+long run is still going, given that the map calls produce grounded bullet notes rather
+than the four sections. The seam exists (`on_token`, ADR 0020, unused by the GUI). The
+hazard is that a partial list reads as the answer — someone seeing notes from fragment
+3 of 14 has no way to know the sanctions appear in fragment 13.
+
 ## Found while measuring item 6, 2026-07-29
 **Status: recorded, nothing fixed, no decision taken**
 
