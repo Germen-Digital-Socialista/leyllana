@@ -650,6 +650,89 @@ reader, not just the new retrieval figures, and it reopens ADR 0017's
 specific, reasoned call that there is no query in the explain task. Recorded
 here so it is not lost, not folded into the current spec.
 
+## Low-RAM, no-GPU target: first real measurement, 2026-07-30
+**Status: recorded, nothing decided, contradicts a prior finding**
+
+Felipe redirected priority: everything measured so far ran on the dev machine
+(16 GB RAM, an unused GPU per ADR 0023). The PRD already names "a laptop
+without a GPU" as the real target (section 6, non-functional requirements),
+but nothing had actually been measured on that profile. This is the first
+attempt, and it produced a result that needs to be flagged loudly rather than
+quietly filed as good news.
+
+### Test environment
+
+A dedicated WSL2 Debian distro, installed alongside the existing WSL1 Kali
+distro (untouched, not converted, not affected by any of this). `.wslconfig`
+caps memory at 8 GB and processors at 4 (the core count was not specified by
+Felipe — picked as a reasonable low-end assumption, flagged here rather than
+silently baked in). `llama-server` built from source at the official tag
+**b10184** (`GGML_CUDA=OFF`, `GGML_VULKAN=OFF`; `--list-devices` confirms
+`(none)`) because llama.cpp does not publish a generic Linux prebuilt in
+releases, only Windows/macOS. `nvidia-smi` is technically visible inside WSL2
+(Windows injects GPU-passthrough infrastructure at the host level, not
+something a distro can opt out of), but this does not compromise the test: the
+binary has no GPU backend compiled in at all, so it cannot use a GPU regardless
+of what `nvidia-smi` reports — the same shape of fact ADR 0023 already
+established for the Windows CPU-only build.
+
+### The measurement: full `explain()`, Qwen3-1.7B, same document as every other figure in this file
+
+Ran the actual `tools/measure_run.py` against the same Ley 21.663 XML fetch
+(99.468 characters) already used throughout this ROADMAP, through the real
+`LocalProvider`/`explain()` code path (not a synthetic call) — same `--jinja`
+and `enable_thinking: False` production behaviour, `ctx = 4096`,
+`max_tokens = 1024`, `temperature = 0,2`, `gpu = "auto"`. Run twice, back to
+back:
+
+| run | total | map calls | faithful? |
+|---|---|---|---|
+| 1 | 586,3 s (9,8 min) | 13 (no reduction round needed) | yes, spot-checked |
+| 2 | 594,6 s (9,9 min) | 13 (no reduction round needed) | yes, spot-checked |
+
+Both runs stayed comfortably inside the 8 GB cap (idle+one-call RSS measured
+separately at ~2,4 GB; neither run OOM'd or was killed). Both cited the same
+claim — "la calificación... se revisa cada tres años" — and it is real,
+verified against the source: `Artículo 6º` says exactly that ("Al menos cada
+tres años, la Agencia deberá revisar y actualizar la calificación..."). Neither
+run invented anything checked.
+
+### This contradicts Phase 1's finding, and that gap is not resolved
+
+Phase 1 (recorded above, "El fallback de baja RAM... inventa en normas
+largas") ran this same model on this same law, also 13 fragments, also this
+ctx, and got **complete fabrication twice** — an invented junta-de-vecinos law
+once, an invented tax law the second time, both exiting cleanly. Two clean runs
+here versus two fabricated runs there, on what should be a comparable setup, is
+too large a gap to file as "the model is fine now." The most concrete lead:
+**the Windows production binary is build b9929; this WSL2 binary is b10184** —
+roughly 255 releases apart, plenty of room for a sampling, chat-template, or
+quantization-kernel change that affects this exact model+quantization
+combination. Not confirmed. Platform (Windows vs. Linux) and the RAM/CPU cap
+are also unruled-out variables. **Do not treat the low-RAM model as
+rehabilitated on this evidence** — Phase 1's finding stands until this
+discrepancy is actually explained, not just noticed.
+
+### A second, separate gap found in both runs: no article numbers at all
+
+FR-6.1/ADR 0014 requires every named article to appear verbatim so a reader can
+spot-check it. Both runs' "Artículos clave" section describes Artículo 6's
+content accurately but **never writes "Artículo 6" or any article number** —
+contrast the Windows Qwen3-4B CPU runs, which did cite specific articles (4,
+5, 39, 40) even when sparse. This is a different failure shape than
+fabrication: the content is faithful, but the traceability the section exists
+to provide is missing. Not fixed, not designed here.
+
+### Not yet done
+
+Only one model (Qwen3-1.7B), one ctx (4096), one document. Qwen3-4B under the
+same 8 GB cap, other ctx values, and — the actual open question behind all of
+this — figuring out why the build gap changed fabrication behaviour, are all
+still open. Felipe asked for this to become an ADR whose results steer the
+rest of the ADRs; per the project's rule that no ADR gets written without his
+decision first, the measurement is recorded here and the ADR itself waits on
+that conversation.
+
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
 
