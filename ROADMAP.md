@@ -811,6 +811,38 @@ then run the same faithfulness battery Qwen3-1.7B was subjected to. Qwen3-1.7B's
 measured fabrication (Phase 1, and the four inconsistent 2026-07-30 runs above)
 is not retracted by this decision — it is the reason a replacement was sought.
 
+## Article selection (BM25 + reranker) implemented, 2026-07-30
+**Status: Implemented (mechanism), not yet validated end to end**
+
+Gemma 3 1B's repeated failure to cap "Articulos clave" at 5-6 articles (even with a
+one-shot example demonstrating the target shape) reframed the low-RAM fallback's problem:
+it wasn't fabricating, it was being asked to judge importance and write prose in the same
+call, and the judgment half looked like it might be past what a ~1-2B model can hold
+alongside everything else the prompt asks. Brainstormed, spec'd
+(`docs/superpowers/specs/2026-07-30-fallback-article-selection-design.md`), planned
+(`docs/superpowers/plans/2026-07-30-fallback-article-selection.md`), and implemented the
+same day: a deterministic BM25 scorer ranks articles against a fixed per-`nivel` query, an
+optional Qwen3-Reranker-0.6B cross-encoder (via `llama-server --reranking`) refines the
+shortlist, and the model is now told which articles to explain instead of asked to choose.
+Only `nivel publico` + the local provider take this path; `tecnico` (no article cap) and
+cloud/CLI providers are untouched.
+
+Nine TDD tasks, one commit per task, full suite green (236 passed, 2 skipped — the two
+real-model smoke tests, correctly gated behind env vars pointing at real binaries/GGUFs
+that don't exist on this machine yet). One real bug surfaced and fixed during
+implementation: a wrong test assertion (not an implementation defect) that assumed
+`ArticleChunk.label` was just "Articulo N" when it's actually the whole first line by
+design.
+
+**Still not proven, on purpose:** this closes the mechanism, not the question. Nobody has
+run this against a real Qwen3-1.7B (or Gemma) end to end yet — the smoke test needs a real
+Qwen3-Reranker-0.6B GGUF, which hasn't been downloaded/verified. Whether this actually fixes
+Qwen3-1.7B's fabrication problem (a more severe failure than Gemma's cap-violation) or only
+Gemma's specific selection failure is still an open, measured question, not an assumption.
+It may also change what ADR 0025 needs to decide, since the fallback model's job gets
+materially easier once it isn't asked to judge importance itself — that reassessment hasn't
+happened yet either.
+
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
 
