@@ -533,6 +533,82 @@ plazo; remisión normativa to a reglamento de ejecución; entrada en vigencia an
 disposiciones transitorias (Código Civil arts. 6-7); and what the norm modifica,
 sustituye, intercala or deroga, referenced against the base text.
 
+## Retrieval layer scope — verified corpus size and architecture research, 2026-07-30
+**Status: recorded, nothing decided**
+
+Follow-up to the corpus retrieval section above. A brainstorming session narrowed
+the retrieval layer's actual purpose: not general Q&A over all of Chilean law, but
+a new reader figure — *dirigente* (any kind: vecinal, sindical, partidario,
+deportivo, of an NGO) and *autoridad comunal* (alcalde / municipal team) — asking
+how a specific law affects them, which needs context the source law does not
+contain (municipal competencies, who fiscalizes, obligations on their kind of
+organization). That reframes the open question from "index the corpus" to
+"how big is the slice that actually matters, and how should it be fetched."
+**Nothing here is adopted and no ADR changes.**
+
+### The corpus is verified, and much bigger than assumed
+
+Queried BCN's own SPARQL endpoint directly (`bcnnorms:Norm`, grouped by
+`bcnnorms:type`): **748.783** norms of every kind. Of those, **Ley** alone is
+**35.574**; **Ley + Decreto Ley + Decreto con Fuerza de Ley** (the three types
+that carry force of law) is **53.215**. Felipe's original estimate of ~21.000 was
+off by 1,7x to 35x depending on where the cut is drawn. The remainder is mostly
+`Decreto` (358.352) and `Resolución` (310.902) — administrative acts, not
+statutes.
+
+**BCN's own linked data has no *vigencia* (in-force / repealed) field at all.**
+The `bcn-norms` ontology defines type, dates, numbering, and modification
+relationships, but nothing marking a norm current or superseded. A paper in the
+IFLA repository, from someone working with this same dataset, names this
+directly: *"the coexistence between current and repealed norms... there are no
+elements that clearly identify their status."* An attempt to get a real vigente
+count by querying leychile.cl's own vigencia filter failed — it hit the same
+189-character malformed-URL error page already documented above, so that number
+stays unverified rather than guessed.
+
+### What the field does instead of indexing everything, researched in English
+
+- **Two-stage retrieval — cheap metadata filter first, fetch/embed only the
+  shortlisted full text — is an established production pattern**, not a shortcut.
+  It is explicitly recommended over re-embedding a whole corpus on every change,
+  and metadata pre-filtering (date range, type) before similarity search is a
+  named technique for narrowing the candidate set before the expensive step.
+- **Bulk index-time RAG has a cost the field tracks by name: the staleness gap**,
+  the time between a source changing and the reindex catching up. For corpora in
+  the tens-of-thousands-to-millions-of-chunks range, embedding compute is called
+  out as the dominant cost. Neither of those problems shows up if only a
+  shortlisted handful of documents ever get embedded.
+- **A curated legal corpus (constitution, codes, landmark rulings) is itself a
+  real, used pattern in production legal-RAG systems**, not an ad hoc
+  simplification — reported as a standard way to scope a legal knowledge base.
+- **Sparse (keyword) retrieval is called out as mattering more than dense
+  specifically for legal vocabulary and exact-phrase matching**, which lines up
+  with the BM25-vs-dense gap already measured (0,3 percentage points, recorded
+  above).
+- **Temporal validity is a named hard problem in legal RAG, and the field's
+  answer is date-bounded scoping as a hard constraint**: extract an as-of date
+  and filter the corpus to that validity period, because "was this provision
+  valid on this date" is treated as a first-class question, not an edge case.
+  That is the same gap BCN's own data leaves open — no vigencia field — so
+  filtering by date is not a workaround here, it is what the literature already
+  does for exactly this absence.
+- **CPU embedding is cheap at this scale.** Lightweight encoders (MiniLM-class)
+  embed thousands of short documents per second on CPU; the cost that would
+  actually bite is fetching and storing 53.215 full documents up front, not
+  embedding their titles or metadata.
+
+### Where this leaves the architecture question
+
+Downloading and indexing all 53.215 (or 748.783) norms up front is not what
+production legal-RAG systems do for this class of problem, on the evidence above.
+The shape the research points to combines two things validated separately: a
+two-stage design (a small local metadata index — title, type, organism, dates —
+used to shortlist candidates with no data leaving the machine, then the actual
+text of only those few fetched on demand through the `input` layer leyllana
+already has) with date-bounded filtering standing in for the vigencia field BCN
+does not provide. Still Felipe's decision, still needs its own ADR once decided;
+recorded here so the numbers and the sources are not re-derived next session.
+
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
 
