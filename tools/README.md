@@ -7,9 +7,14 @@ de `src/`, y nada de lo que hacen cambia el comportamiento de leyllana.
 Existen porque una corrida lenta o rara no se puede diagnosticar despues de que
 termino. El 2026-07-29, para responder una sola pregunta del ROADMAP (subir `ctx` y
 volver a medir), hubo que relanzar el binario a mano para averiguar cosas que la
-aplicacion nunca registra: que dispositivos ve el `llama-server`, cuantos tokens
+aplicacion no registraba: que dispositivos ve el `llama-server`, cuantos tokens
 tenia el prompt de verdad, y si el servidor rechazo la peticion. Esto es eso, hecho
 una vez y guardado.
+
+La aplicacion **si** registra ahora sus propias corridas: `leyllana.diagnostics`
+escribe un JSON por corrida y guarda el log del `llama-server` en `mediciones/`
+(`leyllana-gui --sin-diagnostico` lo apaga). Estas herramientas siguen siendo utiles
+para lo que la ventana no hace: comparar builds, ctx y banderas sin abrir la GUI.
 
 **Ninguna de estas herramientas guarda el texto del documento.** Guardan su tamano,
 su recuento de tokens, los tiempos y la configuracion. La postura local-first no se

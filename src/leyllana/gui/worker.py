@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal, Slot
 
+from .. import diagnostics
 from ..config import Config
 from ..engine import explain
 from ..engine.base import Provider
@@ -51,26 +52,41 @@ class ExplainWorker(QObject):
     @Slot()
     def run(self) -> None:
         """Corre la explicacion. Termina siempre emitiendo ``finalizado``."""
+        registro = diagnostics.RunRecord(
+            fuente=self._source, nivel=str(self._nivel), config=self._config
+        )
+
+        def avisar(progreso: Progress) -> None:
+            # El registro se alimenta del mismo aviso que pinta la ventana, para que
+            # lo anotado sea exactamente lo que el usuario vio y no otra cuenta.
+            registro.anotar(progreso)
+            self.progreso.emit(progreso)
+
         try:
-            self.progreso.emit(Progress(Stage.CARGANDO))
+            avisar(Progress(Stage.CARGANDO))
             self.cancel.raise_if_cancelled()
-            self.progreso.emit(Progress(Stage.EXTRAYENDO))
+            avisar(Progress(Stage.EXTRAYENDO))
             texto, info = resolve_with_source(self._source)
+            registro.texto_resuelto(texto)
             explicacion = explain(
                 texto,
                 self._nivel,
                 self._config,
                 self._consent,
-                progress=self.progreso.emit,
+                progress=avisar,
                 cancel=self.cancel,
                 provider=self._provider,
             )
         except Cancelled:
             # No es un fallo: es lo que el usuario pidio.
+            registro.cerrar("cancelada")
             self.cancelado.emit()
         except BaseException as exc:  # noqa: BLE001 - la ventana no puede morirse
+            # Una corrida que fallo es justo la que hay que poder revisar despues.
+            registro.cerrar("fallo", error=f"{type(exc).__name__}: {exc}")
             self.fallo.emit(mensaje(exc))
         else:
+            registro.cerrar("ok")
             self.terminado.emit(explicacion, info)
         finally:
             self.finalizado.emit()

@@ -175,6 +175,7 @@ class LlamaServer:
         self._proc: subprocess.Popen | None = None
         self._base: str | None = None
         self._lock = threading.Lock()
+        self._log = None
 
     def ensure(self) -> str:
         """Arranca el servidor si hace falta, espera a que este sano y da su URL."""
@@ -201,16 +202,39 @@ class LlamaServer:
             ]
             if self._threads > 0:
                 args += ["-t", str(self._threads)]
+            # El log del servidor es lo unico que dice que dispositivos vio, cuantas
+            # capas descargo, cuantos tokens tenia el prompt de verdad y si rechazo
+            # la peticion. Descartarlo dejaba esas preguntas sin respuesta posible,
+            # asi que con el diagnostico encendido se guarda (ADR 0023).
+            salida = self._abrir_log()
             # cwd = carpeta del binario: llama.cpp carga sus backends ggml-*.dll
             # (por CPU) relativos al ejecutable/cwd; asi se encuentran siempre.
             self._proc = subprocess.Popen(
                 args,
                 cwd=str(self._binary.parent),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=salida,
+                stderr=salida,
             )
             self._wait_healthy()
             return self._base
+
+    def _abrir_log(self):
+        """Destino de la salida del servidor: un archivo si hay, DEVNULL si no.
+
+        Devuelve DEVNULL cuando el diagnostico esta apagado, que es el
+        comportamiento por defecto, y tambien si el archivo no se puede abrir: un
+        log que no se puede escribir no debe impedir que el modelo corra.
+        """
+        from ..diagnostics import log_servidor
+
+        destino = log_servidor()
+        if destino is None:
+            return subprocess.DEVNULL
+        try:
+            self._log = destino.open("ab")
+        except OSError:
+            return subprocess.DEVNULL
+        return self._log
 
     def _wait_healthy(self, timeout: float = _HEALTH_TIMEOUT) -> None:
         deadline = time.monotonic() + timeout
@@ -233,6 +257,9 @@ class LlamaServer:
                 self._proc.wait(timeout=5)
             except Exception:  # noqa: BLE001 - forzar cierre si no termina
                 self._proc.kill()
+        if self._log is not None:
+            self._log.close()
+            self._log = None
 
 
 __all__ = ["LlamaServer", "chat_completion", "resolve_gpu_layers"]

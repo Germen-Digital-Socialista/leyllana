@@ -13,7 +13,7 @@ import sys
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from .. import __version__
+from .. import __version__, diagnostics
 from ..config import load, resolve_path
 from . import assets, theme
 from .main_window import MainWindow
@@ -37,6 +37,22 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="ruta a leyllana.toml (por defecto: ./leyllana.toml si existe)",
     )
+    parser.add_argument(
+        "--diagnostico",
+        metavar="CARPETA",
+        default="mediciones",
+        help=(
+            "carpeta donde dejar el registro de cada corrida y el log del "
+            "llama-server (por defecto: mediciones). Nunca guarda el texto del "
+            "documento"
+        ),
+    )
+    parser.add_argument(
+        "--sin-diagnostico",
+        dest="sin_diagnostico",
+        action="store_true",
+        help="no escribir ningun registro de corrida",
+    )
     return parser
 
 
@@ -45,6 +61,16 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     ruta = resolve_path(args.config)
     config = load(args.config)
+
+    # El diagnostico se enciende antes de construir nada, porque el log del
+    # llama-server se decide cuando el proceso se levanta y eso ocurre despues.
+    if not args.sin_diagnostico:
+        try:
+            destino = diagnostics.activar(args.diagnostico)
+            print(f"Registro de corridas: {destino}")
+        except OSError as exc:
+            # No poder escribir el diagnostico no es motivo para no abrir la ventana.
+            print(f"Sin registro de corridas ({exc})", file=sys.stderr)
 
     app = QApplication(sys.argv[:1])
     app.setApplicationName("leyllana")
