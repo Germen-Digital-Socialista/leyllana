@@ -788,6 +788,29 @@ kind of failure). Nothing concluded about Gemma 3 1B from a single failed run
 beyond "the current prompt/output contract does not reliably work with it
 out of the box."
 
+## Low-RAM fallback: decided, 2026-07-30 — Gemma 3 1B replaces Qwen3-1.7B
+**Status: Decided (ADR 0024, ADR 0025), implementation not started**
+
+Felipe reviewed the alternatives above (characterize further / retrieval-scoped
+input for the existing model / replace the model / drop the slot) and chose to
+replace the model. Between the small candidates, Gemma 3 1B was picked for its
+verified Spanish/multilingual pretraining strength, over Phi-4 Mini (MIT-clean
+license, but untested for Spanish or faithfulness) and LFM2 (a ~75% English
+pretraining mix, and a USD 10M-revenue license cap that isn't strictly OSI
+either). Gemma's license is not OSI-permissive and is remotely revocable by
+Google — the same bar ADR 0015 rejected Gemma-2-4B on — so this needed its own
+decision: **ADR 0024** waives that bar for the fallback slot only, scoped to
+Felipe's own estimate of this tool's expected use (a small pilot, on the order
+of ten users within the party); the default model (Qwen3-4B, Apache 2.0) keeps
+the bar unchanged. **ADR 0025** records the model swap itself.
+
+**This is a decision, not a validated fix.** Gemma 3 1B's only prior attempt
+(recorded above, 2026-07-30) failed on the output contract before faithfulness
+could even be assessed. Before this can ship: fix the output-contract failure,
+then run the same faithfulness battery Qwen3-1.7B was subjected to. Qwen3-1.7B's
+measured fabrication (Phase 1, and the four inconsistent 2026-07-30 runs above)
+is not retracted by this decision — it is the reason a replacement was sought.
+
 ## Phase 4 — Packaging and pilot
 **Status: Not Started**
 
