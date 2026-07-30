@@ -12,10 +12,11 @@ from __future__ import annotations
 import unicodedata
 
 from ..config import Config
-from ..prompt import build, build_extract
+from ..prompt import build, build_extract, build_with_selection
 from ..types import Explanation, Nivel
 from .base import ConsentRequired, Provider
 from .chunking import chars_for_tokens, estimate_tokens, split_structural
+from .local import LocalProvider
 from .progress import (
     Cancelled,
     CancelToken,
@@ -25,6 +26,7 @@ from .progress import (
     check,
     report,
 )
+from .ranking import RerankerClient, select_key_articles
 from .registry import get_provider
 
 # Reserva de tokens para el system prompt y sus instrucciones (fuera del texto).
@@ -85,9 +87,33 @@ def explain(
     condensed = _condense(text, provider, cfg, progress=progress, cancel=cancel)
     check(cancel)
     report(progress, Stage.GENERANDO)
-    raw = provider.generate(build(condensed, nivel), cancel=cancel)
+    if nivel == Nivel.PUBLICO and isinstance(provider, LocalProvider):
+        reranker = _reranker_for(cfg)
+        try:
+            articulos = select_key_articles(text, nivel, reranker=reranker)
+            raw = provider.generate(
+                build_with_selection(condensed, articulos, nivel), cancel=cancel
+            )
+        finally:
+            if reranker is not None:
+                reranker.close()
+    else:
+        raw = provider.generate(build(condensed, nivel), cancel=cancel)
     report(progress, Stage.VERIFICANDO)
     return parse(raw)
+
+
+def _reranker_for(config: Config) -> RerankerClient | None:
+    """Construye un ``RerankerClient`` si hay un modelo re-rankeador configurado.
+
+    Sin ``reranker_model.path``, ``select_key_articles`` sigue funcionando con
+    BM25 solo (ADR-style graceful degrade, no un error)."""
+    engine = config.engine
+    if not engine.reranker_model.path or not engine.server_path:
+        return None
+    return RerankerClient(
+        engine.server_path, engine.reranker_model.path, ctx=engine.reranker_model.ctx
+    )
 
 
 def _check_consent(provider: Provider, consent: bool) -> None:

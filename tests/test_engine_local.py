@@ -220,3 +220,53 @@ def test_explain_local_end_to_end_parsed(monkeypatch):
     assert isinstance(exp, Explanation)
     assert exp.que_hace == "regula el uso de IA."
     assert exp.en_una_frase == "una ley sobre IA."
+
+
+def test_explain_uses_selection_for_publico_local_provider(monkeypatch):
+    # Ley corta (bajo el tope): select_key_articles devuelve todo sin rankear, asi
+    # que este test no necesita reranker ni BM25 real, solo confirmar que
+    # build_with_selection (no build) es lo que arma el prompt para PUBLICO+local.
+    canned = (
+        "Que hace: regula algo.\n"
+        "A quien afecta: a los organismos.\n"
+        "Articulos clave: Articulo 1.\n"
+        "En una frase: una ley sobre IA."
+    )
+    captured = {}
+
+    def fake_chat(base, messages, *, temperature, max_tokens, **kwargs):
+        captured["messages"] = messages
+        return canned
+
+    monkeypatch.setattr("leyllana.engine.local.chat_completion", fake_chat)
+    monkeypatch.setattr(LocalProvider, "_ensure_server", lambda self: "http://fake")
+
+    texto = "Articulo 1. Regula el uso de sistemas de IA por organismos publicos."
+    exp = explain(texto, Nivel.PUBLICO, _local_cfg())
+
+    assert isinstance(exp, Explanation)
+    user_msg = captured["messages"][1]["content"]
+    assert "Articulos preseleccionados" in user_msg
+    assert "Articulo 1" in user_msg
+
+
+def test_explain_tecnico_still_uses_plain_build(monkeypatch):
+    # TECNICO no pasa por la seleccion (no tiene tope) -- sigue usando build().
+    canned = (
+        "Que hace: regula algo.\n"
+        "A quien afecta: a los organismos.\n"
+        "Articulos clave: Articulo 1.\n"
+        "En una frase: una ley sobre IA."
+    )
+    captured = {}
+
+    def fake_chat(base, messages, *, temperature, max_tokens, **kwargs):
+        captured["messages"] = messages
+        return canned
+
+    monkeypatch.setattr("leyllana.engine.local.chat_completion", fake_chat)
+    monkeypatch.setattr(LocalProvider, "_ensure_server", lambda self: "http://fake")
+
+    explain("Articulo 1. Texto.", Nivel.TECNICO, _local_cfg())
+    user_msg = captured["messages"][1]["content"]
+    assert "Articulos preseleccionados" not in user_msg
