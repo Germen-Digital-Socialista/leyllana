@@ -13,20 +13,34 @@ a generic role.
 
 ---
 
-## Next step (as of 2026-07-30)
+## First real validation: faithful, 2026-07-31
 
-The BM25/reranker article-selection mechanism is implemented and tested (see "Article
-selection (BM25 + reranker) implemented, 2026-07-30" below), but not yet run for real. To
-actually find out whether it fixes anything:
+Ran the actual mechanism end to end against **Qwen3-1.7B** on Ley 21.663 (the same document
+used throughout this file), `nivel publico`, real `Qwen3-Reranker-0.6B-Q8_0` GGUF
+(`ggml-org`), real BM25 shortlist, real cross-encoder rerank. **246.8 s (4.1 min) total —
+faster than the ~590 s baseline**, plausibly because the model now explains a small
+pre-selected set instead of scanning the whole law and choosing.
 
-1. Get a real **Qwen3-Reranker-0.6B** GGUF (download, verify license/source — same
-   due-diligence pattern as every other model choice here).
-2. Point `engine.models.reranker` at it in `leyllana.toml`.
-3. Run `explain()` on a real law at `nivel publico` with **Qwen3-1.7B** as the fallback
-   model (not Gemma — model-agnostic validation first, per the earlier decision) and check
-   whether the "Articulos clave" selection is faithful and the fabrication problem is gone.
-4. Only after that: decide whether this changes what ADR 0025 (the Gemma swap) needs to
-   decide.
+**All 5 selected articles (38, 40, 41, 44, 45) verified word-for-word against the source**,
+including the precise legal term "mérito ejecutivo" (Articulo 44) matched verbatim. Nothing
+fabricated in this run. Saved at `mediciones/reranker-validacion-qwen3-1.7b.md`
+(gitignored, local only, per this repo's data-sovereignty convention).
+
+**Two real bugs found and fixed getting here, both from actually running it, not from
+tests:**
+1. `llama-server` forces its physical batch size to 512 tokens in reranking mode by
+   default; a real article can exceed that (measured: 1073 tokens). Fixed by matching
+   `RerankerClient`'s `-ub` to `ctx`.
+2. `select_key_articles` capped by article *count*, not token weight — 6 real articles
+   summed to more tokens than the entire prompt budget, even though the condensed overview
+   alone fit fine. Fixed with a token-budget-aware greedy selection.
+
+**One success on one document with one model is not a rate.** This project's own repeated
+lesson (four inconsistent Qwen3-1.7B runs earlier in this file) is that a handful of runs
+doesn't establish reliability. Next real step: repeat this across more documents/runs
+before trusting it, and only then revisit what ADR 0025 (the Gemma swap) needs to decide —
+this result doesn't resolve that on its own, it just clears the mechanism to be measured
+properly.
 
 ---
 
