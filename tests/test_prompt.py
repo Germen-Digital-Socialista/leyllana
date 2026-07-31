@@ -1,5 +1,62 @@
-from leyllana.prompt import GUARDRAIL, build, build_with_selection
+from leyllana.prompt import (
+    GUARDRAIL,
+    build,
+    build_gloss,
+    build_overview,
+    build_with_selection,
+)
 from leyllana.types import DISCLAIMER, ArticleChunk, Explanation, Nivel
+
+
+def test_build_gloss_includes_guardrail():
+    art = ArticleChunk(label="Articulo 17", text="Articulo 17.- La comunicacion de datos.")
+    assert GUARDRAIL in build_gloss(art, Nivel.PUBLICO).system
+
+
+def test_build_gloss_sees_only_the_one_article():
+    art = ArticleChunk(label="Articulo 17", text="Articulo 17.- Contenido unico del articulo.")
+    p = build_gloss(art, Nivel.PUBLICO)
+    assert "Contenido unico del articulo." in p.user
+
+
+def test_build_gloss_does_not_ask_for_the_four_sections():
+    # El gloss es la explicacion de UN articulo, no la salida de cuatro secciones:
+    # esas se arman aparte. Pedir secciones aqui rompe el aislamiento.
+    art = ArticleChunk(label="Articulo 1", text="Articulo 1. Algo.")
+    system = build_gloss(art, Nivel.PUBLICO).system
+    for titulo in ("A quien afecta", "Articulos clave", "En una frase"):
+        assert titulo not in system
+
+
+def test_build_gloss_tells_model_not_to_write_the_number():
+    # El numero lo estampa el pipeline (short_label); si el modelo lo escribe,
+    # vuelve el modo de mala atribucion que este cambio elimina.
+    art = ArticleChunk(label="Articulo 17", text="Articulo 17.- Algo.")
+    assert "no escribas el numero" in build_gloss(art, Nivel.PUBLICO).system.lower()
+
+
+def test_build_gloss_is_pure():
+    art = ArticleChunk(label="Articulo 1", text="Articulo 1. Algo.")
+    assert build_gloss(art, Nivel.PUBLICO) == build_gloss(art, Nivel.PUBLICO)
+
+
+def test_build_overview_asks_the_three_narrative_sections_not_articulos_clave():
+    # La llamada de resumen produce solo las tres secciones narrativas; "Articulos
+    # clave" se arma articulo por articulo, aparte.
+    system = build_overview("resumen de la ley", Nivel.PUBLICO).system
+    for titulo in ("Que hace", "A quien afecta", "En una frase"):
+        assert titulo in system
+    assert "Articulos clave" not in system
+
+
+def test_build_overview_includes_guardrail_and_overview_text():
+    p = build_overview("resumen de la ley sobre datos", Nivel.PUBLICO)
+    assert GUARDRAIL in p.system
+    assert "resumen de la ley sobre datos" in p.user
+
+
+def test_build_overview_is_pure():
+    assert build_overview("r", Nivel.PUBLICO) == build_overview("r", Nivel.PUBLICO)
 
 
 def test_build_with_selection_includes_articles_verbatim():

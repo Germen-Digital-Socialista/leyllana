@@ -32,27 +32,38 @@ GUARDRAIL = (
 #
 # Ninguno de los dos nombra su fuente ni un rol concreto dentro del prompt. Ver
 # el comentario de abajo sobre por que.
+# El nivel PUBLICO se arma de tres piezas para que los caminos que no producen
+# "Articulos clave" (build_overview, build_gloss) tomen solo el registro y no la
+# instruccion de seleccion de articulos, que ahi sobra y confunde:
+#   - REGISTER_CORE: audiencia y registro, sin nombrar ninguna seccion.
+#   - ALCANCE: no dar a entender que aplica a cualquiera; menciona 'A quien afecta'.
+#   - SELECCION: el tope de cinco o seis; menciona 'Articulos clave'.
+#
+# La audiencia se describe en abstracto a proposito. Nombrar un rol concreto aqui
+# ("la presidenta de una junta de vecinos") hizo que un modelo chico lo tomara por
+# materia de la norma y explicara una ley que no existe, sin que nada fallara.
+_PUBLICO_REGISTER_CORE = (
+    "Audiencia: una persona sin formacion juridica. Usa lenguaje llano y "
+    "cotidiano, frases cortas, y evita tecnicismos; si un termino legal es "
+    "inevitable, explicalo entre parentesis. Responde lo que esa persona "
+    "necesita saber: si la norma la obliga a ella, que tendria que hacer y "
+    "desde cuando, y que consecuencia hay si no lo hace."
+)
+_PUBLICO_ALCANCE = (
+    "Si la norma no obliga a la gente comun sino al Estado o a cierto tipo de "
+    "empresas, dilo claramente en 'A quien afecta' en vez de dar a entender que "
+    "le aplica a cualquiera."
+)
+# El tope de articulos es deliberado: sin el, una ley larga produce un catalogo de
+# todo el articulado, fiel pero ilegible para quien no es abogado.
+_PUBLICO_SELECCION = (
+    "No enumeres todo el articulado: en 'Articulos clave' elige a lo mas cinco o "
+    "seis articulos, los que de verdad le cambian algo a una persona comun, y "
+    "deja fuera el resto."
+)
+
 _NIVEL_INSTRUCTIONS: dict[Nivel, str] = {
-    # El tope de articulos es deliberado: sin el, una ley larga produce un
-    # catalogo de todo el articulado, fiel pero ilegible para quien no es
-    # abogado, que es justamente el lector de este nivel.
-    #
-    # La audiencia se describe en abstracto a proposito. Nombrar un rol concreto
-    # aqui ("la presidenta de una junta de vecinos") hizo que un modelo chico lo
-    # tomara por materia de la norma y explicara una ley que no existe, con el
-    # rol inventado dentro de las cuatro secciones y sin que nada fallara.
-    Nivel.PUBLICO: (
-        "Audiencia: una persona sin formacion juridica. Usa lenguaje llano y "
-        "cotidiano, frases cortas, y evita tecnicismos; si un termino legal es "
-        "inevitable, explicalo entre parentesis. Responde lo que esa persona "
-        "necesita saber: si la norma la obliga a ella, que tendria que hacer y "
-        "desde cuando, y que consecuencia hay si no lo hace. No enumeres todo el "
-        "articulado: en 'Articulos clave' elige a lo mas cinco o seis articulos, "
-        "los que de verdad le cambian algo a una persona comun, y deja fuera el "
-        "resto. Si la norma no obliga a la gente comun sino al Estado o a cierto "
-        "tipo de empresas, dilo claramente en 'A quien afecta' en vez de dar a "
-        "entender que le aplica a cualquiera."
-    ),
+    Nivel.PUBLICO: f"{_PUBLICO_REGISTER_CORE} {_PUBLICO_SELECCION} {_PUBLICO_ALCANCE}",
     # Este nivel manda, no autoriza. La version anterior decia "puedes usar el
     # registro tecnico-legislativo" y el resultado era practicamente el mismo que
     # el nivel publico: un permiso no cambia nada, y encima competia contra dos
@@ -217,6 +228,82 @@ def build_with_selection(
     return Prompt(system=system, user=user)
 
 
+# Las tres secciones narrativas (todas menos "Articulos clave"): describen la
+# norma en conjunto y salen del resumen condensado, no de concatenar el articulado.
+_OVERVIEW_SECTIONS: dict[Nivel, tuple[str, ...]] = {
+    Nivel.PUBLICO: tuple(
+        s for s in _SECTIONS[Nivel.PUBLICO] if not s.startswith("Articulos clave")
+    ),
+}
+
+# Registro sin la instruccion de seleccion, para los caminos que no producen
+# "Articulos clave": el resumen usa el nucleo mas el alcance (produce 'A quien
+# afecta'); el gloss de un solo articulo usa solo el nucleo (no tiene secciones).
+_OVERVIEW_REGISTER: dict[Nivel, str] = {
+    Nivel.PUBLICO: f"{_PUBLICO_REGISTER_CORE} {_PUBLICO_ALCANCE}",
+}
+_GLOSS_REGISTER: dict[Nivel, str] = {Nivel.PUBLICO: _PUBLICO_REGISTER_CORE}
+
+
+def build_overview(overview: str, nivel: Nivel) -> Prompt:
+    """Prompt de las tres secciones narrativas (Que hace / A quien afecta / En una
+    frase), sin "Articulos clave".
+
+    En el camino de aislamiento por articulo (ver ``build_gloss``), esa cuarta
+    seccion se arma determinista, articulo por articulo, en vez de pedirla aqui.
+    Dejarla fuera acorta la llamada y elimina la trunca que sufria la salida de
+    cuatro secciones, que se quedaba sin presupuesto antes de "En una frase".
+    Solo tiene sentido para PUBLICO (el unico nivel con preseleccion de articulos).
+    """
+    secciones = "\n".join(_OVERVIEW_SECTIONS[nivel])
+    system = (
+        "Eres leyllana, un asistente que explica leyes y boletines chilenos "
+        "(espanol de Chile).\n\n"
+        f"{GUARDRAIL}\n\n"
+        f"{CITATION}\n\n"
+        f"{_OVERVIEW_REGISTER[nivel]}\n\n"
+        "Responde SIEMPRE con estas tres secciones, en este orden, cada una "
+        "empezando por su titulo exacto al inicio de una linea:\n"
+        f"{secciones}\n\n"
+        f"{FORMATO}"
+    )
+    user = f"Resumen de la norma o boletin:\n\n{overview}"
+    return Prompt(system=system, user=user)
+
+
+# Manda no escribir el numero: el pipeline lo estampa despues con
+# chunking.short_label, tomandolo de la etiqueta real del trozo. Asi el modelo no
+# vuelve a atribuir el contenido de un articulo al numero de otro, que es el modo
+# de fabricacion que este camino elimina (ROADMAP After-number).
+_GLOSS_INSTRUCTION = (
+    "Abajo tienes UN solo articulo. Explica en lenguaje llano y en una o dos frases "
+    "que dice y que implica para una persona comun. No escribas el numero del "
+    "articulo ni ningun encabezado ni titulo de seccion: el sistema agrega el numero "
+    "por su cuenta. Si el articulo remite a otro que no esta a la vista y no se "
+    "entiende sin el, dilo en vez de suponer su contenido."
+)
+
+
+def build_gloss(article: ArticleChunk, nivel: Nivel) -> Prompt:
+    """Prompt que explica UN articulo aislado, sin que el modelo escriba su numero.
+
+    Cada articulo preseleccionado se explica en su propia llamada, viendo solo su
+    texto: el modelo no puede mezclar el contenido de un articulo con el numero de
+    otro porque nunca ve dos a la vez, y no elige el numero porque el pipeline lo
+    estampa (``chunking.short_label``). Ver el spec
+    docs/superpowers/specs/2026-07-31-per-article-isolation-design.md.
+    """
+    system = (
+        "Eres leyllana, un asistente que explica leyes y boletines chilenos "
+        "(espanol de Chile).\n\n"
+        f"{GUARDRAIL}\n\n"
+        f"{_GLOSS_REGISTER[nivel]}\n\n"
+        f"{_GLOSS_INSTRUCTION}"
+    )
+    user = f"Articulo a explicar:\n\n{article.text}"
+    return Prompt(system=system, user=user)
+
+
 def build_extract(chunk: str) -> Prompt:
     """Prompt para extraer puntos clave fieles de un FRAGMENTO (map de ADR 0017).
 
@@ -241,6 +328,8 @@ __all__ = [
     "Prompt",
     "build",
     "build_extract",
+    "build_gloss",
+    "build_overview",
     "build_with_selection",
     "GUARDRAIL",
     "CITATION",
