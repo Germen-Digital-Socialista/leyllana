@@ -27,9 +27,21 @@ def test_engine_generation_defaults():
     cfg = Config()
     assert cfg.engine.server_path is None
     assert cfg.engine.gpu == "auto"
+    assert cfg.engine.kv_cache_type == "f16"
     assert cfg.engine.temperature == 0.2
     assert cfg.engine.max_tokens == 1024
     assert cfg.engine.threads == 0
+
+
+def test_load_reads_kv_cache_type(tmp_path):
+    toml = tmp_path / "leyllana.toml"
+    toml.write_text(
+        "[engine]\n"
+        'provider = "local"\n'
+        'kv_cache_type = "q8_0"\n',
+        encoding="utf-8",
+    )
+    assert load(toml).engine.kv_cache_type == "q8_0"
 
 
 def test_reranker_model_defaults():

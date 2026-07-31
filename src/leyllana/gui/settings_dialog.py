@@ -246,6 +246,7 @@ class SettingsDialog(QDialog):
             ),
             server_path=_o_none(self.server_path.text()),
             gpu=self.gpu.currentData(),
+            kv_cache_type=base.kv_cache_type,
             temperature=self.temperatura.value(),
             max_tokens=self.max_tokens.value(),
             threads=self.threads.value(),

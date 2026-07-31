@@ -24,7 +24,14 @@ provider = "local"
 # server_path = "C:/llama.cpp/llama-server.exe"
 
 # "auto" prueba GPU y cae a CPU, "cpu" fuerza CPU, "gpu" fuerza la descarga a GPU.
+# En "auto" se le pregunta al binario que dispositivos ve (--list-devices), no se
+# adivina por nvidia-smi (ADR 0023). "gpu" no verifica: respeta la eleccion.
 gpu = "auto"
+
+# Tipo de dato de la cache KV. "f16" (default de llama.cpp) o "q8_0" para reducir
+# a la mitad la RAM/VRAM que ocupa la cache a cambio de algo de precision. Deja
+# entrar contextos mas largos en el mismo presupuesto de memoria (ADR 0023).
+# kv_cache_type = "f16"
 
 # Generacion conservadora, para no inventar (ADR 0008).
 temperature = 0.2

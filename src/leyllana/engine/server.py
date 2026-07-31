@@ -18,7 +18,7 @@ que hace que el boton Cancelar de la GUI signifique algo (PRD FR-10).
 from __future__ import annotations
 
 import json
-import shutil
+import re
 import socket
 import subprocess
 import threading
@@ -26,7 +26,9 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 from .base import ProviderError
 from .progress import Cancelled, CancelToken
@@ -47,19 +49,107 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
-def resolve_gpu_layers(gpu: str) -> int:
-    """Traduce el modo de GPU (ADR 0012) a ``-ngl`` para ``llama-server``.
+class Device(NamedTuple):
+    """Un dispositivo de computo que el binario reporta en ``--list-devices``."""
 
-    ``cpu`` -> 0, ``gpu`` -> todas las capas, ``auto`` -> descarga a GPU si se
-    detecta una NVIDIA (``nvidia-smi`` en el PATH) y si no, CPU. Nunca falla en una
-    maquina sin GPU: cae a CPU.
+    id: str
+    name: str
+    total_mib: int
+    free_mib: int
+
+
+# Linea de dispositivo: "  CUDA0: NVIDIA GeForce RTX 5060 (7708 MiB, 7573 MiB free)".
+# El nombre puede traer parentesis ("Intel(R) Graphics (ARL)"), asi que se ancla en
+# el grupo final de memoria y el nombre es todo lo que queda antes, no-codicioso.
+_DEVICE_RE = re.compile(
+    r"^\s*(?P<id>[^:\s]+):\s+(?P<name>.+?)\s*"
+    r"\((?P<total>\d+)\s*MiB,\s*(?P<free>\d+)\s*MiB free\)\s*$",
+    re.MULTILINE,
+)
+
+# Cache por ruta de binario: la lista de dispositivos no cambia dentro de una
+# corrida, y la GUI mantiene el proveedor vivo entre explicaciones (ADR 0021).
+_device_cache: dict[str, list[Device]] = {}
+
+
+def parse_device_list(output: str) -> list[Device]:
+    """Extrae los dispositivos del texto de ``llama-server --list-devices``.
+
+    Solo cuenta lineas con el sufijo de memoria; las lineas de init de ggml
+    ("Device 0: ..., compute capability ...") no lo traen y quedan fuera. Un build
+    CPU-only imprime solo la cabecera y devuelve lista vacia (ADR 0023).
+    """
+    return [
+        Device(m["id"], m["name"], int(m["total"]), int(m["free"]))
+        for m in _DEVICE_RE.finditer(output)
+    ]
+
+
+def probe_devices(binary_path: str | Path) -> list[Device]:
+    """Pregunta al binario que dispositivos ve, y cachea la respuesta por ruta.
+
+    Ejecuta ``<binario> --list-devices`` y parsea su salida. Si el binario no se
+    puede ejecutar (falta, timeout, error), devuelve lista vacia: fallar la
+    deteccion cae a CPU en vez de abortar (ADR 0023).
+    """
+    key = str(binary_path)
+    if key in _device_cache:
+        return _device_cache[key]
+    try:
+        proc = subprocess.run(
+            [key, "--list-devices"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(Path(key).parent),
+        )
+        devices = parse_device_list((proc.stdout or "") + (proc.stderr or ""))
+    except (OSError, subprocess.SubprocessError):
+        devices = []
+    _device_cache[key] = devices
+    return devices
+
+
+@dataclass(frozen=True)
+class OffloadPlan:
+    """Que ``-ngl`` usar, en que dispositivo quedo y por que (ADR 0023)."""
+
+    ngl: int
+    device: Device | None
+    report: str
+
+
+def plan_offload(gpu: str, binary_path: str | Path | None) -> OffloadPlan:
+    """Decide la descarga a GPU segun el modo (ADR 0012) y el dispositivo real.
+
+    ``cpu`` -> CPU. ``gpu`` -> descarga forzada, SIN verificar: una eleccion
+    explicita del usuario no se segundo-adivina (fill-only, ADR 0027). ``auto`` ->
+    consulta la lista de dispositivos del binario y descarga solo si hay alguno; si
+    la lista viene vacia, cae a CPU y lo deja dicho en vez de absorberlo (ADR 0023).
     """
     mode = (gpu or "auto").lower()
     if mode == "cpu":
-        return 0
+        return OffloadPlan(0, None, "CPU (forzado por config).")
     if mode == "gpu":
-        return _GPU_ALL_LAYERS
-    return _GPU_ALL_LAYERS if shutil.which("nvidia-smi") else 0
+        return OffloadPlan(
+            _GPU_ALL_LAYERS,
+            None,
+            "GPU (forzado por config; no se verifico el dispositivo).",
+        )
+    devices = probe_devices(binary_path) if binary_path is not None else []
+    if devices:
+        d = devices[0]
+        return OffloadPlan(
+            _GPU_ALL_LAYERS,
+            d,
+            f"GPU (auto): {d.id} {d.name} ({d.free_mib}/{d.total_mib} MiB libres).",
+        )
+    return OffloadPlan(0, None, "CPU (auto): el binario no reporta dispositivos GPU.")
+
+
+def resolve_gpu_layers(gpu: str, binary_path: str | Path | None = None) -> int:
+    """Traduce el modo de GPU a ``-ngl`` (ADR 0012, 0023). Ver ``plan_offload``."""
+    return plan_offload(gpu, binary_path).ngl
 
 
 def _http_json(url: str, payload: dict | None = None, *, timeout: float) -> dict:
@@ -193,6 +283,7 @@ class LlamaServer:
         ctx: int,
         gpu: str,
         threads: int,
+        kv_cache_type: str = "f16",
         extra_args: tuple[str, ...] = (),
     ) -> None:
         self._binary = Path(binary_path)
@@ -200,11 +291,15 @@ class LlamaServer:
         self._ctx = ctx
         self._gpu = gpu
         self._threads = threads
+        self._kv_cache_type = kv_cache_type
         self._extra_args = extra_args
         self._proc: subprocess.Popen | None = None
         self._base: str | None = None
         self._lock = threading.Lock()
         self._log = None
+        # En que dispositivo quedo y por que (ADR 0023). Se llena en ``ensure``.
+        self.device: Device | None = None
+        self.device_report: str = ""
 
     def ensure(self) -> str:
         """Arranca el servidor si hace falta, espera a que este sano y da su URL."""
@@ -220,13 +315,25 @@ class LlamaServer:
 
             port = _free_port()
             self._base = f"http://127.0.0.1:{port}"
+            # Verifica el dispositivo en vez de adivinar, y deja registrado en cual
+            # quedo y por que (ADR 0023): una caida silenciosa de GPU a CPU es un 5x
+            # presentado como normalidad.
+            plan = plan_offload(self._gpu, self._binary)
+            self.device = plan.device
+            self.device_report = plan.report
+            # KV en q8_0 (u otro) solo si se pidio: f16 es el default de llama.cpp y
+            # no pasar los flags deja el argv de los llamadores existentes intacto.
+            kv_args: list[str] = []
+            if self._kv_cache_type and self._kv_cache_type != "f16":
+                kv_args = ["-ctk", self._kv_cache_type, "-ctv", self._kv_cache_type]
             args = [
                 str(self._binary),
                 "-m", str(self._model),
                 "--host", "127.0.0.1",
                 "--port", str(port),
                 "-c", str(self._ctx),
-                "-ngl", str(resolve_gpu_layers(self._gpu)),
+                "-ngl", str(plan.ngl),
+                *kv_args,
                 "--jinja",
                 *self._extra_args,
             ]
@@ -237,6 +344,14 @@ class LlamaServer:
             # la peticion. Descartarlo dejaba esas preguntas sin respuesta posible,
             # asi que con el diagnostico encendido se guarda (ADR 0023).
             salida = self._abrir_log()
+            if self._log is not None:
+                try:
+                    self._log.write(
+                        f"[leyllana] Dispositivo: {plan.report}\n".encode("utf-8")
+                    )
+                    self._log.flush()
+                except OSError:
+                    pass
             # cwd = carpeta del binario: llama.cpp carga sus backends ggml-*.dll
             # (por CPU) relativos al ejecutable/cwd; asi se encuentran siempre.
             self._proc = subprocess.Popen(
@@ -292,4 +407,14 @@ class LlamaServer:
             self._log = None
 
 
-__all__ = ["LlamaServer", "chat_completion", "rerank", "resolve_gpu_layers"]
+__all__ = [
+    "Device",
+    "LlamaServer",
+    "OffloadPlan",
+    "chat_completion",
+    "parse_device_list",
+    "plan_offload",
+    "probe_devices",
+    "rerank",
+    "resolve_gpu_layers",
+]

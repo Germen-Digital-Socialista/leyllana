@@ -42,6 +42,7 @@ class LocalProvider:
                 ctx=model.ctx,
                 gpu=engine.gpu,
                 threads=engine.threads,
+                kv_cache_type=engine.kv_cache_type,
             )
             atexit.register(self._server.stop)
         return self._server.ensure()

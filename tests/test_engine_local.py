@@ -30,11 +30,141 @@ def test_resolve_gpu_cpu_and_gpu():
     assert server_mod.resolve_gpu_layers("gpu") == 999
 
 
-def test_resolve_gpu_auto_detects_nvidia(monkeypatch):
-    monkeypatch.setattr(server_mod.shutil, "which", lambda name: "/usr/bin/nvidia-smi")
-    assert server_mod.resolve_gpu_layers("auto") == 999
-    monkeypatch.setattr(server_mod.shutil, "which", lambda name: None)
-    assert server_mod.resolve_gpu_layers("auto") == 0
+def test_resolve_gpu_auto_uses_device_list(monkeypatch):
+    # ADR 0023: "auto" pregunta al binario que dispositivos ve, en vez de adivinar
+    # por la presencia de nvidia-smi (que no dice nada del backend compilado).
+    monkeypatch.setattr(
+        server_mod, "probe_devices",
+        lambda binary: [server_mod.Device("CUDA0", "X", 8192, 8000)],
+    )
+    assert server_mod.resolve_gpu_layers("auto", "srv") == 999
+    monkeypatch.setattr(server_mod, "probe_devices", lambda binary: [])
+    assert server_mod.resolve_gpu_layers("auto", "srv") == 0
+
+
+# --- Parseo de la lista de dispositivos (ADR 0023) --------------------------
+
+def test_parse_device_list_empty():
+    # Un build CPU-only imprime la cabecera y nada mas (verificado en b9929).
+    assert server_mod.parse_device_list("Available devices:\n") == []
+
+
+def test_parse_device_list_cuda():
+    out = "Available devices:\n  CUDA0: NVIDIA GeForce RTX 5060 (7708 MiB, 7573 MiB free)\n"
+    assert server_mod.parse_device_list(out) == [
+        server_mod.Device("CUDA0", "NVIDIA GeForce RTX 5060", 7708, 7573)
+    ]
+
+
+def test_parse_device_list_name_with_parentheses():
+    # El nombre del dispositivo puede traer parentesis: hay que anclar en el grupo
+    # final "(N MiB, N MiB free)", no en el primer parentesis.
+    out = "Available devices:\n  Vulkan0: Intel(R) Graphics (ARL) (11577 MiB, 8251 MiB free)\n"
+    assert server_mod.parse_device_list(out) == [
+        server_mod.Device("Vulkan0", "Intel(R) Graphics (ARL)", 11577, 8251)
+    ]
+
+
+def test_parse_device_list_multiple():
+    out = (
+        "Available devices:\n"
+        "  CUDA0: NVIDIA GeForce RTX 5060 (7708 MiB, 7573 MiB free)\n"
+        "  Vulkan0: Intel(R) Graphics (ARL) (11577 MiB, 8251 MiB free)\n"
+    )
+    devs = server_mod.parse_device_list(out)
+    assert [d.id for d in devs] == ["CUDA0", "Vulkan0"]
+
+
+def test_parse_device_list_ignores_init_noise():
+    # Las lineas de init de ggml ("Device 0: ..., compute capability ...") no traen
+    # el sufijo de memoria y no deben contarse como dispositivos.
+    out = (
+        "ggml_cuda_init: found 1 CUDA devices:\n"
+        "  Device 0: NVIDIA GeForce RTX 5060, compute capability 12.0, VMM: yes\n"
+        "Available devices:\n"
+        "  CUDA0: NVIDIA GeForce RTX 5060 (7708 MiB, 7573 MiB free)\n"
+    )
+    assert server_mod.parse_device_list(out) == [
+        server_mod.Device("CUDA0", "NVIDIA GeForce RTX 5060", 7708, 7573)
+    ]
+
+
+# --- Decision de descarga a GPU (ADR 0023) ----------------------------------
+
+def test_plan_offload_cpu_does_not_probe(monkeypatch):
+    def boom(binary):
+        raise AssertionError("cpu no debe consultar dispositivos")
+
+    monkeypatch.setattr(server_mod, "probe_devices", boom)
+    plan = server_mod.plan_offload("cpu", "srv")
+    assert plan.ngl == 0
+    assert plan.device is None
+
+
+def test_plan_offload_gpu_forced_does_not_probe(monkeypatch):
+    # Fill-only (ADR 0027): una eleccion explicita del usuario no se verifica ni se
+    # segundo-adivina. "gpu" forzado pasa -ngl 999 sin consultar el dispositivo.
+    llamadas = []
+    monkeypatch.setattr(server_mod, "probe_devices", lambda binary: llamadas.append(binary) or [])
+    plan = server_mod.plan_offload("gpu", "srv")
+    assert plan.ngl == 999
+    assert llamadas == []
+
+
+def test_plan_offload_auto_with_device(monkeypatch):
+    dev = server_mod.Device("Vulkan0", "Intel(R) Graphics", 11577, 8251)
+    monkeypatch.setattr(server_mod, "probe_devices", lambda binary: [dev])
+    plan = server_mod.plan_offload("auto", "srv")
+    assert plan.ngl == 999
+    assert plan.device == dev
+    assert "Vulkan0" in plan.report
+
+
+def test_plan_offload_auto_no_device_falls_back_to_cpu(monkeypatch):
+    monkeypatch.setattr(server_mod, "probe_devices", lambda binary: [])
+    plan = server_mod.plan_offload("auto", "srv")
+    assert plan.ngl == 0
+    assert plan.device is None
+
+
+# --- probe_devices: subprocess + cache (ADR 0023) ---------------------------
+
+class _FakeProc:
+    def __init__(self, stdout="", stderr=""):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = 0
+
+
+def test_probe_devices_parses_binary_output(monkeypatch):
+    out = "Available devices:\n  CUDA0: NVIDIA GeForce RTX 5060 (7708 MiB, 7573 MiB free)\n"
+    monkeypatch.setattr(server_mod.subprocess, "run", lambda *a, **k: _FakeProc(stdout=out))
+    server_mod._device_cache.clear()
+    devs = server_mod.probe_devices("srv-parse")
+    assert devs == [server_mod.Device("CUDA0", "NVIDIA GeForce RTX 5060", 7708, 7573)]
+
+
+def test_probe_devices_empty_on_failure(monkeypatch):
+    def boom(*a, **k):
+        raise OSError("no se pudo ejecutar")
+
+    monkeypatch.setattr(server_mod.subprocess, "run", boom)
+    server_mod._device_cache.clear()
+    assert server_mod.probe_devices("srv-boom") == []
+
+
+def test_probe_devices_caches_per_binary(monkeypatch):
+    llamadas = []
+
+    def run(*a, **k):
+        llamadas.append(1)
+        return _FakeProc(stdout="Available devices:\n")
+
+    monkeypatch.setattr(server_mod.subprocess, "run", run)
+    server_mod._device_cache.clear()
+    server_mod.probe_devices("srv-cache")
+    server_mod.probe_devices("srv-cache")
+    assert len(llamadas) == 1
 
 
 # La lectura de la respuesta paso a ser en streaming (ADR 0020) y se prueba
@@ -171,6 +301,73 @@ def test_ensure_without_extra_args_unchanged(monkeypatch, tmp_path):
     srv = server_mod.LlamaServer(str(binary), str(model), ctx=2048, gpu="cpu", threads=0)
     srv.ensure()
     assert captured["args"][-1] == "--jinja"
+
+
+def test_ensure_records_device_report(monkeypatch, tmp_path):
+    # ADR 0023: el motor registra en que dispositivo quedo y por que, en vez de
+    # absorber en silencio una caida de GPU a CPU.
+    binary = tmp_path / "llama-server.exe"
+    binary.write_text("x")
+    model = tmp_path / "m.gguf"
+    model.write_text("x")
+
+    class FakeProc:
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(server_mod.subprocess, "Popen", lambda args, **k: FakeProc())
+    monkeypatch.setattr(server_mod.LlamaServer, "_wait_healthy", lambda self, timeout=180.0: None)
+    monkeypatch.setattr(server_mod, "probe_devices", lambda binary: [])
+
+    srv = server_mod.LlamaServer(str(binary), str(model), ctx=2048, gpu="auto", threads=0)
+    srv.ensure()
+    assert srv.device_report  # cadena no vacia
+    assert srv.device is None
+
+
+def test_ensure_appends_kv_cache_type_when_set(monkeypatch, tmp_path):
+    binary = tmp_path / "llama-server.exe"
+    binary.write_text("x")
+    model = tmp_path / "m.gguf"
+    model.write_text("x")
+    captured = {}
+
+    class FakeProc:
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(server_mod.subprocess, "Popen", lambda args, **k: captured.update(args=args) or FakeProc())
+    monkeypatch.setattr(server_mod.LlamaServer, "_wait_healthy", lambda self, timeout=180.0: None)
+
+    srv = server_mod.LlamaServer(
+        str(binary), str(model), ctx=2048, gpu="cpu", threads=0, kv_cache_type="q8_0"
+    )
+    srv.ensure()
+    args = captured["args"]
+    assert args[args.index("-ctk") + 1] == "q8_0"
+    assert args[args.index("-ctv") + 1] == "q8_0"
+
+
+def test_ensure_omits_kv_flags_for_default_f16(monkeypatch, tmp_path):
+    # f16 es el default de llama.cpp: no hace falta pasar -ctk/-ctv, y no pasarlos
+    # mantiene el argv de los llamadores existentes sin cambios.
+    binary = tmp_path / "llama-server.exe"
+    binary.write_text("x")
+    model = tmp_path / "m.gguf"
+    model.write_text("x")
+    captured = {}
+
+    class FakeProc:
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(server_mod.subprocess, "Popen", lambda args, **k: captured.update(args=args) or FakeProc())
+    monkeypatch.setattr(server_mod.LlamaServer, "_wait_healthy", lambda self, timeout=180.0: None)
+
+    srv = server_mod.LlamaServer(str(binary), str(model), ctx=2048, gpu="cpu", threads=0)
+    srv.ensure()
+    assert "-ctk" not in captured["args"]
+    assert "-ctv" not in captured["args"]
 
 
 def test_rerank_returns_scores_in_input_order(monkeypatch):

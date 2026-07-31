@@ -34,6 +34,7 @@ def _config_completa() -> Config:
             ),
             server_path=r"C:\llama\llama-server.exe",
             gpu="cpu",
+            kv_cache_type="q8_0",
             temperature=0.1,
             max_tokens=2048,
             threads=4,
