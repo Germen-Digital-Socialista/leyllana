@@ -13,6 +13,54 @@ a generic role.
 
 ---
 
+## After-number: the segmentation fix was necessary, not sufficient, 2026-07-31
+
+The regex defect the section below diagnosed is fixed (commit `353b924`,
+`split_by_article` now segments on `_ARTICLE_OPEN_RE`). This records what the fix
+actually bought, measured the same way the before-number was.
+
+**At the layer it touches, the fix is verified correct.** Model-free audit
+(`tools/audit_segmentation.py`) over the same three documents: noise 0.0% / 3.6% /
+12.8% -> 0.0% across all three. `propio` and `estructura` counts are unchanged, so
+no real article was lost; only the 7 spurious chunks disappeared. Every
+cross-reference the failed Ley 21.719 runs had cited is gone from the candidate set.
+The control (Ley 21.663) segments byte-identically. Four TDD tests lock the behavior.
+
+**End to end, faithfulness did not improve.** The 9-run protocol was re-run with the
+same fixed criterion and the same Qwen3-1.7B config, fresh process and fresh condense
+per run, 0 parse failures:
+
+| Document | Before (session 2) | After (session 3) |
+|---|---|---|
+| Ley 21.663 (control) | 3/3 faithful | 3/3 faithful |
+| Ley 19.628 | 2/3 faithful | 1/3 faithful |
+| Ley 21.719 | 0/3 faithful | 0/3 faithful |
+| Total | 5/9 | 4/9 |
+
+The aggregate is flat-to-down because a **second fabrication mode, independent of
+segmentation, now dominates: the small model misattributes real articles.**
+
+- **Ley 19.628** fails on real chunks, not spurious ones. Runs put Artículo 16's
+  multa clause under the label "Artículo 17" (which actually governs which
+  economic-obligation data may be communicated), and call Artículo 18 (a five-year
+  data-communication limit) a sanction norm. This reproduces session 2's exact
+  finding, confirming it is a model mode the regex fix cannot reach.
+- **Ley 21.719** no longer cites non-existent content: the "artículo 30 bis" and
+  "artículo 19 N° 4 de la Constitución" citations are gone. But it is a *modifying*
+  law whose "articles" mix inserted substantive articles, modification directives,
+  and transitory ordinals, and the model labels real content misleadingly (e.g.
+  "Artículo 6: amonestación..." is verbatim the transitory Artículo sexto, while
+  Artículo 6º is "Derecho de rectificación"). The failure mode changed; the verdict
+  did not.
+
+**What is now open:** the model-misattribution mode (label vs content), and the
+distinct, harder modifying-law case where the unit "article" is itself ambiguous.
+Neither is a segmentation defect. Full per-citation classification, each fabrication
+quoted against source, in `mediciones/validacion-20260731-postfix/resultados.md`
+(local, `mediciones/` is gitignored).
+
+---
+
 ## Correccion: la validacion de mas abajo era de un solo documento, 2026-07-31
 
 **Lo que dice la seccion siguiente sigue siendo cierto y sigue siendo insuficiente.** Ese
