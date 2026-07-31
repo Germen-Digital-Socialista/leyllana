@@ -96,9 +96,11 @@ uv run leyllana --file proyecto.pdf --acepto-nube
 
 ## Estado
 
-Acceso anticipado, y ya no es solo diseño ni solo terminal. El motor funciona de principio a fin y está probado contra normas reales de la BCN, con el modelo local y con la nube por suscripción. La ventana es lo último que se sumó: la fase 3 está lista.
+Acceso anticipado. Ya no es diseño ni solo terminal: el motor corre de principio a fin, con el modelo local y con la nube por suscripción, y la ventana está lista (la fase 3). Lo probé contra leyes reales de la BCN, a mano, una por una, comparando cada artículo que cita contra el texto original. Son un puñado de normas, no las dieciséis mil que hay. Prefiero decir que anduvo en las que revisé y no que "funciona" a secas.
 
-Lo que falta es el instalador, la fase 4. Hoy para partir hay que tener Python y `uv`, y eso deja afuera justo a quien esto tenía que servirle. Esa es la próxima pega.
+Porque la promesa es no inventar, y esa promesa se gana ley por ley. En eso estoy: que cuando cite el artículo 17, sea el 17, y diga lo que el 17 dice. Cuando el texto no alcanza, lo dice en vez de rellenar.
+
+Lo que falta para que le sirva a quien tiene que servirle es el instalador, la fase 4. Hoy para partir hay que tener Python y `uv`, y eso deja afuera justo a esa persona. Esa es la próxima pega.
 
 El diseño completo sigue publicado y al día: la visión (`PRD.md`), la hoja de ruta (`ROADMAP.md`) y las decisiones de arquitectura (`docs/adr/`), una por cada cosa que se decidió y por qué se decidió así. Si quieres aportar, empieza por ahí.
 
