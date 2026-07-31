@@ -68,6 +68,38 @@ baseline. Full per-citation classification, each fabrication quoted against sour
 
 ---
 
+## 4B diagnostic: the default is far more faithful than the fallback we measured, 2026-07-31
+
+Every faithfulness figure in this file, including the 5/9 above, was measured on Qwen3-1.7B
+(the low-RAM *fallback*), selected by a manual config override to keep numbers comparable.
+The shipping default is Qwen3-4B, and no default-user faithfulness had ever been measured.
+Ran Ley 19.628 (the doc the 1.7B failed 0/3, whose Art 16 it inverted) through the 4B
+default, same ISO pipeline, ctx 4096, fresh process/condense per run.
+
+**Result: 3/3 faithful on the 4B, vs 0/3 on the 1.7B.** Two drivers and one caveat:
+- The 4B's narrative comprehension is genuinely better: it identifies Ley 19.628 as a
+  data-protection law (sensitive data, survey disclosure), where the 1.7B fabricated a
+  fiscal-law subject. A real capability gain.
+- The 4B selected only Artículo 19 (budget-driven: its more verbose condense leaves less
+  token budget, so the 4,296-char Art 16 no longer fits), so it *sidestepped* the article
+  the 1.7B mangled. Art 19's gloss is fully faithful — every figure ("siete días", "tres
+  días", the blocking rule, "se sancionará según el artículo 16") is verbatim in Art 19.
+- **Caveat:** because the 4B never selected Art 16, this does NOT prove the 4B glosses that
+  hard article correctly — it avoided it. That question is still open.
+
+**Speed: ~18 min per run on the CPU binary** (r1 1127 s, r2 1079 s, r3 1071 s), ~10x the
+1.7B. The 4B is the faithful model but is unusable at CPU speed — which is the concrete case
+for implementing **ADR 0023** (Vulkan build, Accepted but not yet built): the measured Vulkan
+speedup here (22.9 → 4.8 min on a long law) would bring the 4B into range.
+
+**Bearing on the pending model-selection ADR (0027):** the fallback is a real quality drop,
+not a wash, so auto-selecting the largest model that fits is worth doing. And because the 4B
+is faithful-but-slow-on-CPU while the 1.7B is fast-but-weaker, selection is a genuine
+per-machine trade-off — the case for keying off the machine's specs. Detail:
+`mediciones/validacion-20260731-iso-4b/resultados.md` (local, gitignored).
+
+---
+
 ## After-number: the segmentation fix was necessary, not sufficient, 2026-07-31
 
 The regex defect the section below diagnosed is fixed (commit `353b924`,
