@@ -204,7 +204,12 @@ def build_with_selection(
         f"{secciones}\n\n"
         f"{FORMATO}"
     )
-    articulos_texto = "\n\n".join(f"{a.label}\n{a.text}" for a in articles)
+    # Solo a.text, no f"{a.label}\n{a.text}": ArticleChunk.label es la primera
+    # linea completa del articulo (no una etiqueta corta tipo "Articulo 5"), y
+    # a.text ya empieza con esa misma linea -- anteponer el label duplicaba el
+    # comienzo de cada articulo. Encontrado corriendo la validacion real:
+    # gastaba tokens de sobra y el modelo terminaba sin llegar a "en una frase".
+    articulos_texto = "\n\n".join(a.text for a in articles)
     user = (
         f"Resumen de la norma o boletin:\n\n{overview}\n\n"
         f"Articulos preseleccionados:\n\n{articulos_texto}"

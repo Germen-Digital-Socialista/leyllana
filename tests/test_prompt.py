@@ -18,6 +18,17 @@ def test_build_with_selection_tells_model_not_to_choose():
     assert "preseleccionados" in p.system.lower()
 
 
+def test_build_with_selection_does_not_duplicate_the_articles_own_opening_line():
+    # ArticleChunk.label es la primera linea completa del articulo (no una
+    # etiqueta corta), y text ya empieza con esa misma linea. Anteponer el
+    # label duplicaba esa oracion de apertura en el prompt -- encontrado
+    # corriendo la validacion real, no en un test con fixtures cortas.
+    apertura = "Articulo 40. De las sanciones. La infraccion conlleva multa."
+    articles = [ArticleChunk(label=apertura, text=f"{apertura}\n1. Detalle uno.")]
+    p = build_with_selection("resumen", articles, Nivel.PUBLICO)
+    assert p.user.count(apertura) == 1
+
+
 def test_build_with_selection_keeps_the_four_sections():
     p = build_with_selection("r", [ArticleChunk(label="Articulo 1", text="x")], Nivel.PUBLICO)
     for titulo in ("Que hace", "A quien afecta", "Articulos clave", "En una frase"):
