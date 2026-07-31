@@ -90,7 +90,14 @@ def explain(
     if nivel == Nivel.PUBLICO and isinstance(provider, LocalProvider):
         reranker = _reranker_for(cfg)
         try:
-            articulos = select_key_articles(text, nivel, reranker=reranker)
+            # Presupuesto de tokens para los articulos, no solo cantidad: unos
+            # pocos articulos largos pueden pesar mas que el presupuesto entero
+            # del prompt (medido en una ley real). Ver el docstring de
+            # select_key_articles.
+            articulo_budget = max(0, _budget_tokens(cfg, provider) - estimate_tokens(condensed))
+            articulos = select_key_articles(
+                text, nivel, reranker=reranker, max_tokens=articulo_budget
+            )
             raw = provider.generate(
                 build_with_selection(condensed, articulos, nivel), cancel=cancel
             )

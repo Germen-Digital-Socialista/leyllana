@@ -67,6 +67,30 @@ def test_select_key_articles_tecnico_has_no_fixed_query_but_still_caps():
     assert len(result) == 6
 
 
+def test_select_key_articles_respects_token_budget():
+    # Articulos moderadamente largos: cap=6 normalmente los devolveria todos,
+    # pero un presupuesto de tokens chico debe recortar antes de llegar a 6.
+    partes = []
+    for i in range(1, 8):
+        relleno = " ".join(["palabra"] * 60)  # ~60 tokens de relleno cada uno
+        partes.append(f"Articulo {i}. multa plazo sancion {relleno}\n")
+    text = "".join(partes)
+    result = select_key_articles(text, Nivel.PUBLICO, cap=6, max_tokens=80)
+    assert 1 <= len(result) < 6
+
+
+def test_select_key_articles_keeps_at_least_one_even_over_budget():
+    text = "Articulo 1. " + " ".join(["palabra"] * 200) + "\n"
+    result = select_key_articles(text, Nivel.PUBLICO, cap=6, max_tokens=5)
+    assert len(result) == 1
+
+
+def test_select_key_articles_max_tokens_none_is_unbounded():
+    text = "Articulo 1. uno\nArticulo 2. dos\n"
+    result = select_key_articles(text, Nivel.PUBLICO, cap=6, max_tokens=None)
+    assert len(result) == 2
+
+
 def test_reranker_client_sets_physical_batch_to_ctx():
     # llama-server fuerza -ub a 512 en modo reranking por defecto, y un articulo
     # real puede superar eso (medido: 1073 tokens en un caso real) y el servidor
