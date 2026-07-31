@@ -105,13 +105,19 @@ class RerankerClient:
     deteccion de GPU para esto)."""
 
     def __init__(self, server_path: str, model_path: str, *, ctx: int = 2048) -> None:
+        # ``-ub`` (physical batch) por defecto en llama-server queda forzado a 512
+        # en modo reranking/embeddings; un articulo real puede superar eso
+        # facilmente (medido: Articulo 9 de la Ley 21.663 son 1073 tokens) y el
+        # servidor responde HTTP 500 "input is too large to process" en vez de
+        # truncar en silencio. Igualarlo a ``ctx`` deja pasar cualquier articulo
+        # que ya quepa en el contexto configurado.
         self._server = LlamaServer(
             server_path,
             model_path,
             ctx=ctx,
             gpu="cpu",
             threads=0,
-            extra_args=("--reranking", "--pooling", "rank"),
+            extra_args=("--reranking", "--pooling", "rank", "-ub", str(ctx)),
         )
 
     def rank(self, chunks: list[ArticleChunk], query: str) -> list[ArticleChunk]:

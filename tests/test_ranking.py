@@ -67,6 +67,14 @@ def test_select_key_articles_tecnico_has_no_fixed_query_but_still_caps():
     assert len(result) == 6
 
 
+def test_reranker_client_sets_physical_batch_to_ctx():
+    # llama-server fuerza -ub a 512 en modo reranking por defecto, y un articulo
+    # real puede superar eso (medido: 1073 tokens en un caso real) y el servidor
+    # responde 500 en vez de truncar. RerankerClient debe igualar -ub a ctx.
+    client = RerankerClient("srv", "m.gguf", ctx=4096)
+    assert client._server._extra_args == ("--reranking", "--pooling", "rank", "-ub", "4096")
+
+
 def test_reranker_client_reorders_by_relevance_score(monkeypatch):
     chunks = [
         ArticleChunk(label="Articulo 1", text="poco relevante"),
