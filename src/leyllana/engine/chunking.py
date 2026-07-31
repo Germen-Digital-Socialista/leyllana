@@ -60,6 +60,40 @@ _ARTICLE_OPEN_RE = re.compile(
 )
 
 
+# Extrae la cita corta ("Articulo 17") de la primera linea completa que es
+# ``ArticleChunk.label``. La usa la asignacion determinista de "Articulos clave":
+# el numero lo estampa el pipeline desde aqui, no lo elige el modelo, que es lo
+# que hacia mal (contenido real bajo el numero equivocado; ROADMAP After-number).
+# Reutiliza el vocabulario de ordinales/sufijos de la apertura de articulo.
+_SHORT_ARTICLE_RE = re.compile(
+    rf"^[ \t]*(Art[ií]culo|Art\.)[ \t]+({_ORDINAL})(?:[ \t]*[º°])?(?:[ \t]+({_SUFIJO}))?",
+    re.IGNORECASE,
+)
+_SHORT_STRUCT_RE = re.compile(
+    r"^[ \t]*(T[ií]tulo|Cap[ií]tulo|P[áa]rrafo)[ \t]+([IVXLCDM]+|\d+)",
+    re.IGNORECASE,
+)
+
+
+def short_label(label: str) -> str:
+    """Cita corta desde la primera linea de un articulo (``ArticleChunk.label``).
+
+    ``"Articulo 17.- La comunicacion..."`` -> ``"Articulo 17"``;
+    ``"Articulo 16 sexies.- ..."`` -> ``"Articulo 16 sexies"``. Si no reconoce una
+    apertura de articulo ni de seccion, devuelve la primera linea saneada: nunca
+    fabrica un numero (misma disciplina anti-invencion que el resto del pipeline).
+    """
+    m = _SHORT_ARTICLE_RE.match(label)
+    if m:
+        palabra, ordinal, sufijo = m.group(1), m.group(2), m.group(3)
+        cita = f"{palabra} {ordinal}"
+        return f"{cita} {sufijo}" if sufijo else cita
+    s = _SHORT_STRUCT_RE.match(label)
+    if s:
+        return f"{s.group(1)} {s.group(2)}"
+    return label.strip().splitlines()[0].strip()
+
+
 def estimate_tokens(text: str) -> int:
     """Estima los tokens de ``text`` (aproximacion por caracteres)."""
     return int(len(text) / _CHARS_PER_TOKEN)
@@ -140,4 +174,11 @@ def split_structural(
     return chunks
 
 
-__all__ = ["ArticleChunk", "estimate_tokens", "chars_for_tokens", "split_by_article", "split_structural"]
+__all__ = [
+    "ArticleChunk",
+    "estimate_tokens",
+    "chars_for_tokens",
+    "short_label",
+    "split_by_article",
+    "split_structural",
+]

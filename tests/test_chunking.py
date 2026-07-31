@@ -4,7 +4,38 @@ Funciones puras: sin modelo ni red. Cubren la estimacion de tokens, el corte por
 limites de la ley chilena (Articulo/Titulo/Capitulo) y el fallback por tamano.
 """
 
-from leyllana.engine.chunking import ArticleChunk, estimate_tokens, split_by_article, split_structural
+from leyllana.engine.chunking import (
+    ArticleChunk,
+    estimate_tokens,
+    short_label,
+    split_by_article,
+    split_structural,
+)
+
+
+def test_short_label_plain_article():
+    # El stamp que cita cada bullet de "Articulos clave": el numero tal como
+    # abre el articulo, sin el resto de la primera linea.
+    assert short_label("Articulo 17.- La comunicacion de datos economicos.") == "Articulo 17"
+
+
+def test_short_label_keeps_suffix():
+    assert short_label("Articulo 16 sexies.- Geolocalizacion en tiempo real.") == "Articulo 16 sexies"
+
+
+def test_short_label_ordinal_word():
+    # Los transitorios se escriben con ordinal en palabra, no en cifra.
+    assert short_label("Articulo primero.- Las modificaciones entran en vigencia.") == "Articulo primero"
+
+
+def test_short_label_drops_degree_mark_and_accent_preserved():
+    assert short_label("Artículo 5º. El titular podra oponerse.") == "Artículo 5"
+
+
+def test_short_label_falls_back_to_first_line_when_no_article_marker():
+    # Nunca inventa un numero: si no hay marca de articulo, devuelve la primera
+    # linea saneada en vez de fabricar "Articulo N".
+    assert short_label("Disposiciones transitorias\ny finales.") == "Disposiciones transitorias"
 
 
 def test_split_by_article_one_chunk_per_articulo():
