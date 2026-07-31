@@ -26,21 +26,39 @@ including the precise legal term "mérito ejecutivo" (Articulo 44) matched verba
 fabricated in this run. Saved at `mediciones/reranker-validacion-qwen3-1.7b.md`
 (gitignored, local only, per this repo's data-sovereignty convention).
 
-**Two real bugs found and fixed getting here, both from actually running it, not from
-tests:**
+**Three real bugs found and fixed getting here, all from actually running it, not from
+tests with short fixtures:**
 1. `llama-server` forces its physical batch size to 512 tokens in reranking mode by
    default; a real article can exceed that (measured: 1073 tokens). Fixed by matching
    `RerankerClient`'s `-ub` to `ctx`.
 2. `select_key_articles` capped by article *count*, not token weight — 6 real articles
    summed to more tokens than the entire prompt budget, even though the condensed overview
    alone fit fine. Fixed with a token-budget-aware greedy selection.
+3. `build_with_selection` prefixed each article with `a.label` before `a.text` --
+   `ArticleChunk.label` is the article's whole first line by design (Task 1), and `text`
+   already starts with that same line, so every article's opening sentence was silently
+   duplicated in the prompt. Ran 3 repeats after the first success: **2 of 3 failed**
+   parsing (`missing "en una frase"`) -- not fabrication, not truncation at max_tokens
+   (generation finished in ~11s, nowhere near budget). Traced with raw-output capture:
+   the model was stopping early on the duplicated content before finishing all four
+   sections. Fixed by joining articles on `a.text` alone. **Re-tested 5 times after the
+   fix: 5/5 parsed, and all 5 independently verified faithful** against the source (same
+   correct articles: 38, 40, 41, 44, 45; exact matches including "mérito ejecutivo" and
+   the 25% pronto-pago discount).
 
-**One success on one document with one model is not a rate.** This project's own repeated
-lesson (four inconsistent Qwen3-1.7B runs earlier in this file) is that a handful of runs
-doesn't establish reliability. Next real step: repeat this across more documents/runs
-before trusting it, and only then revisit what ADR 0025 (the Gemma swap) needs to decide —
-this result doesn't resolve that on its own, it just clears the mechanism to be measured
-properly.
+**Honest tally across today's runs:** 2 fully independent end-to-end pipeline runs before
+the label-duplication fix (both faithful), 2 parse failures traced to that bug (not
+fabrication), and 5 repeated samples of the final generation step after the fix (5/5
+faithful, though these share one condense pass, so they confirm the fix, not full
+pipeline independence). **Zero fabricated content across every run today, once the three
+engineering bugs above are set aside.** That's a meaningfully different picture from
+Qwen3-1.7B's earlier four-runs-four-outcomes finding, but still not enough independent
+full-pipeline samples to quote a faithfulness rate.
+
+**Next real step:** repeat full independent pipeline runs (fresh condense each time)
+across more documents before trusting this broadly, and only then revisit what ADR 0025
+(the Gemma swap) needs to decide — this result doesn't resolve that on its own, it clears
+the mechanism to be measured properly.
 
 ---
 
