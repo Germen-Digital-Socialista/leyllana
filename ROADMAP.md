@@ -13,6 +13,47 @@ a generic role.
 
 ---
 
+## Model selection and device verification now ship (ADR 0023 code, ADR 0027), 2026-07-31
+
+Two decisions moved from "measured but unimplemented" to shipping code. Neither is the
+faithful-4B-at-usable-speed unlock on its own; that still waits on the Vulkan binary (below).
+
+**ADR 0027 written and implemented: the machine's memory now picks the model.** Until now
+`LocalProvider` always started the default (Qwen3-4B) regardless of RAM, so an 8 GB floor
+machine could OOM at server start (llama.cpp preallocates the whole KV cache) and never reach
+the fallback without a hand edit. It now measures the live backend's memory -- device VRAM
+when the GPU is active, total system RAM on CPU -- and runs the largest configured model whose
+footprint (GGUF file + KV cache at the configured ctx, computed from GGUF metadata, not
+guessed) fits ~60% of it. An explicit `engine.model_selection = default|fallback` pins a slot
+and wins; `auto` only fills when none is pinned (fill-only). If even the smallest model
+overflows the budget, or memory can't be measured, it runs the smallest and records a warning
+rather than refusing (run-anywhere, ADR 0012). Decided parameters (60% fraction, file+KV
+footprint, run-smallest-and-warn floor) came from Felipe directly.
+
+**ADR 0023 code side implemented: the GPU path verifies the device instead of guessing.**
+`resolve_gpu_layers` no longer infers a GPU from `nvidia-smi` on the PATH (which says nothing
+about the backend compiled into our binary and, on the CPU-only build, was confidently wrong).
+`gpu = "auto"` now asks the binary itself via `--list-devices` and offloads only if it reports
+a device, falling back to CPU with a stated reason; forced `gpu = "gpu"` still offloads
+unverified, honoring the explicit choice. The engine records which device it landed on and why
+(`device_report`). Also added `engine.kv_cache_type` (default `f16`, e.g. `q8_0` -> `-ctk/-ctv`)
+to halve KV memory at long ctx.
+
+**Verified.** 302 tests pass. On this dev machine the real RAM read returns 15.82 GiB (matches
+the known spec); at 60% that is a 9.49 GiB budget, so `auto` correctly selects the 4B here. On
+the real CPU-only b9929 binary, `--list-devices` reports no GPU and `auto` now correctly picks
+CPU (`ngl 0`) where the old `nvidia-smi` guess would have falsely passed `-ngl 999`.
+
+**Still open.** (1) The actual Vulkan `llama-server` build (ADR 0023's headline) is an external
+artifact Felipe must supply into `backend/bin`; until then the GPU path can't light up and the
+faithful 4B stays at ~18 min/run on CPU. The verification code is ready for it. (2) Whether the
+4B glosses Ley 19.628's hard Art 16 correctly is still untested (it dodged it -- handoff step
+3: force Art 16 into selection and re-run x3). (3) The `device_report`/`model_report` strings
+are logged and exposed as attributes but not yet surfaced in the GUI. Commits: `0f445da`
+(ADR 0027 doc), `ee4458e` (ADR 0023 code), `c403133` (ADR 0027 impl). None pushed.
+
+---
+
 ## Per-article isolation: the misattribution mode is eliminated, aggregate up 4/9 to 5/9, 2026-07-31
 
 The misattribution mode the section below diagnosed (the small model binding real content to
