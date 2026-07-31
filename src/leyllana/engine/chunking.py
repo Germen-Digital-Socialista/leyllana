@@ -66,7 +66,8 @@ _ARTICLE_OPEN_RE = re.compile(
 # que hacia mal (contenido real bajo el numero equivocado; ROADMAP After-number).
 # Reutiliza el vocabulario de ordinales/sufijos de la apertura de articulo.
 _SHORT_ARTICLE_RE = re.compile(
-    rf"^[ \t]*(Art[ií]culo|Art\.)[ \t]+({_ORDINAL})(?:[ \t]*[º°])?(?:[ \t]+({_SUFIJO}))?",
+    rf"^[ \t]*(Art[ií]culo|Art\.)[ \t]+({_ORDINAL})(?:[ \t]*[º°])?"
+    rf"(?:[ \t]+({_SUFIJO}))?",
     re.IGNORECASE,
 )
 _SHORT_STRUCT_RE = re.compile(
