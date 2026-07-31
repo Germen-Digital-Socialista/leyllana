@@ -13,6 +13,61 @@ a generic role.
 
 ---
 
+## Per-article isolation: the misattribution mode is eliminated, aggregate up 4/9 to 5/9, 2026-07-31
+
+The misattribution mode the section below diagnosed (the small model binding real content to
+the wrong article number) is fixed at its root. The approach, chosen after a six-lens research
+fan-out that ranked it first unanimously over two alternatives (in-prompt authoritative
+headers; a post-generation citation guard): take the article NUMBER away from the model the
+same way the selection layer already took the article CHOICE away. "Articulos clave" is now
+built one article per model call, each call seeing only that article's text, and the pipeline
+stamps the number from the chunk's own label (`chunking.short_label`). The model never sees two
+articles at once and never emits a number. Spec:
+`docs/superpowers/specs/2026-07-31-per-article-isolation-design.md`. Commits: `short_label`,
+`build_overview`/`build_gloss`, the engine assembly, and two fixes the measurement forced.
+
+**Headline, verified: zero mislabeling across all 9 runs.** Ley 19.628's multa clause is now
+correctly under Artículo 16 in every run (the baseline mislabeled it "Artículo 17"); Ley
+21.719's transitory article is stamped "Artículo sexto", distinct from the permanent "Artículo
+6º" (the baseline collapsed them). The number is a pipeline output now; it cannot be wrong.
+
+**End to end, the aggregate improved modestly and the composition shifted.** The 9-run protocol
+was re-run with the same fixed criterion and Qwen3-1.7B config, fresh process and condense per
+run, 0 parse failures:
+
+| Document | postfix (session 3) | ISO (session 4) |
+|---|---|---|
+| Ley 21.663 (control) | 3/3 faithful | 3/3 faithful |
+| Ley 19.628 | 1/3 faithful | 0/3 faithful |
+| Ley 21.719 | 0/3 faithful | 2/3 faithful |
+| Total | 4/9 | 5/9 |
+
+- **Control held, and got better underneath the number.** 3/3, now with correct labels AND
+  accurate glosses (Art 44 "diez días / artículo 53 del Código Tributario", Art 45 "25% / cinco
+  días", Art 40 "prescripción tres años" all verbatim). Grounding the overview in the selected
+  articles was necessary: the first ISO attempt fed the narrative only the condensed summary and
+  it fabricated the subject (Ley 19.628 described as a fiscal law); the measurement caught it.
+- **Ley 21.719 went 0/3 to 2/3.** The modifying-law case improved precisely because the
+  labeling that sank it is fixed. The one failure (r3) misstates the role of an external law
+  (ley 20.416 defines company-size categories, not the infractions).
+- **Ley 19.628 went 1/3 to 0/3, on a different failure than before.** No mislabeling now; instead
+  all three runs invert the two-track appeal of Art 16 (a 4,296-char procedural article with
+  eight lettered subsections), sending the "causa distinta" case to the Corte Suprema when that
+  court is for the seguridad-nación case. This is within-article comprehension of one long, hard
+  article read in isolation, not misattribution.
+
+**What is now open.** ISO did what it was designed to do and is not sufficient on its own. The
+limiting factor moved: it is no longer the pipeline's handling of which article and under what
+number, it is the small model's reading of a single complex article. Two remaining classes,
+neither addressed by ISO: within-article comprehension of long procedural articles read in
+isolation, and the model's handling of external-law references. A usefulness cost also appeared:
+4 of ~24 glosses returned "No se puede determinar" (honest, not fabrication, but a cited article
+that refuses is not useful) — the price of isolation, absent from the concatenated-prompt
+baseline. Full per-citation classification, each fabrication quoted against source, in
+`mediciones/validacion-20260731-iso/resultados.md` (local, `mediciones/` is gitignored).
+
+---
+
 ## After-number: the segmentation fix was necessary, not sufficient, 2026-07-31
 
 The regex defect the section below diagnosed is fixed (commit `353b924`,
