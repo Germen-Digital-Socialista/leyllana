@@ -245,15 +245,22 @@ _OVERVIEW_REGISTER: dict[Nivel, str] = {
 _GLOSS_REGISTER: dict[Nivel, str] = {Nivel.PUBLICO: _PUBLICO_REGISTER_CORE}
 
 
-def build_overview(overview: str, nivel: Nivel) -> Prompt:
+def build_overview(
+    overview: str, articles: list[ArticleChunk], nivel: Nivel
+) -> Prompt:
     """Prompt de las tres secciones narrativas (Que hace / A quien afecta / En una
     frase), sin "Articulos clave".
 
     En el camino de aislamiento por articulo (ver ``build_gloss``), esa cuarta
     seccion se arma determinista, articulo por articulo, en vez de pedirla aqui.
-    Dejarla fuera acorta la llamada y elimina la trunca que sufria la salida de
-    cuatro secciones, que se quedaba sin presupuesto antes de "En una frase".
-    Solo tiene sentido para PUBLICO (el unico nivel con preseleccion de articulos).
+    Pedir solo tres secciones acorta la salida y elimina la trunca que sufria la de
+    cuatro, que se quedaba sin presupuesto antes de "En una frase".
+
+    Los articulos preseleccionados van como contexto (no para citarlos aqui, sino
+    para anclar el resumen): sin ellos, medido 2026-07-31, la narrativa se volvia
+    vacua o inventaba la materia de la norma (la Ley 19.628, de datos personales,
+    salio descrita como una ley de obligaciones fiscales). Solo tiene sentido para
+    PUBLICO (el unico nivel con preseleccion de articulos).
     """
     secciones = "\n".join(_OVERVIEW_SECTIONS[nivel])
     system = (
@@ -267,7 +274,11 @@ def build_overview(overview: str, nivel: Nivel) -> Prompt:
         f"{secciones}\n\n"
         f"{FORMATO}"
     )
-    user = f"Resumen de la norma o boletin:\n\n{overview}"
+    articulos_texto = "\n\n".join(a.text for a in articles)
+    user = (
+        f"Resumen de la norma o boletin:\n\n{overview}\n\n"
+        f"Articulos mas relevantes de la norma (contexto):\n\n{articulos_texto}"
+    )
     return Prompt(system=system, user=user)
 
 
@@ -275,12 +286,20 @@ def build_overview(overview: str, nivel: Nivel) -> Prompt:
 # chunking.short_label, tomandolo de la etiqueta real del trozo. Asi el modelo no
 # vuelve a atribuir el contenido de un articulo al numero de otro, que es el modo
 # de fabricacion que este camino elimina (ROADMAP After-number).
+#
+# No invita a rehusar: una version anterior decia "si el articulo remite a otro que
+# no esta a la vista, dilo", y como casi todo articulo legal cita otros, el modelo
+# chico rehusaba casi siempre y devolvia la frase del guardrail para cada articulo
+# (medido 2026-07-31: los cinco articulos de la Ley 21.663 salieron "No se puede
+# determinar"). Se explica lo que el propio articulo dispone; las remisiones a otros
+# articulos o leyes no impiden explicar este.
 _GLOSS_INSTRUCTION = (
-    "Abajo tienes UN solo articulo. Explica en lenguaje llano y en una o dos frases "
-    "que dice y que implica para una persona comun. No escribas el numero del "
-    "articulo ni ningun encabezado ni titulo de seccion: el sistema agrega el numero "
-    "por su cuenta. Si el articulo remite a otro que no esta a la vista y no se "
-    "entiende sin el, dilo en vez de suponer su contenido."
+    "Abajo tienes UN solo articulo de una ley chilena. Explica en lenguaje llano, en "
+    "una o dos frases, que establece este articulo y que implica para una persona "
+    "comun. Explica lo que dice su propio texto; si menciona otros articulos o leyes, "
+    "no necesitas explicar esos: basta con lo que este articulo dispone. No escribas "
+    "el numero del articulo ni ningun encabezado ni titulo de seccion: el sistema "
+    "agrega el numero por su cuenta."
 )
 
 

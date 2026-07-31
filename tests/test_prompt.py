@@ -40,23 +40,30 @@ def test_build_gloss_is_pure():
     assert build_gloss(art, Nivel.PUBLICO) == build_gloss(art, Nivel.PUBLICO)
 
 
+_ONE_ART = [ArticleChunk(label="Articulo 1", text="Articulo 1. Regula los datos.")]
+
+
 def test_build_overview_asks_the_three_narrative_sections_not_articulos_clave():
     # La llamada de resumen produce solo las tres secciones narrativas; "Articulos
     # clave" se arma articulo por articulo, aparte.
-    system = build_overview("resumen de la ley", Nivel.PUBLICO).system
+    system = build_overview("resumen de la ley", _ONE_ART, Nivel.PUBLICO).system
     for titulo in ("Que hace", "A quien afecta", "En una frase"):
         assert titulo in system
     assert "Articulos clave" not in system
 
 
-def test_build_overview_includes_guardrail_and_overview_text():
-    p = build_overview("resumen de la ley sobre datos", Nivel.PUBLICO)
+def test_build_overview_includes_guardrail_overview_text_and_article_context():
+    # Los articulos preseleccionados van como contexto para anclar la narrativa:
+    # sin ellos el modelo chico inventaba la materia de la norma (medido 2026-07-31).
+    articles = [ArticleChunk(label="Articulo 5", text="Articulo 5. El plazo es 10 dias.")]
+    p = build_overview("resumen de la ley sobre datos", articles, Nivel.PUBLICO)
     assert GUARDRAIL in p.system
     assert "resumen de la ley sobre datos" in p.user
+    assert "Articulo 5. El plazo es 10 dias." in p.user
 
 
 def test_build_overview_is_pure():
-    assert build_overview("r", Nivel.PUBLICO) == build_overview("r", Nivel.PUBLICO)
+    assert build_overview("r", _ONE_ART, Nivel.PUBLICO) == build_overview("r", _ONE_ART, Nivel.PUBLICO)
 
 
 def test_build_with_selection_includes_articles_verbatim():

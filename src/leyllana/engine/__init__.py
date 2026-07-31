@@ -139,7 +139,7 @@ def _explain_by_isolation(
             text, nivel, reranker=reranker, max_tokens=articulo_budget
         )
         narrativa = parse_overview(
-            provider.generate(build_overview(condensed, nivel), cancel=cancel)
+            provider.generate(build_overview(condensed, articulos, nivel), cancel=cancel)
         )
         total = len(articulos)
         bullets: list[str] = []
