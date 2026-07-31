@@ -118,6 +118,7 @@ Keep this table in sync whenever an ADR is added or a status changes.
 | 0024 | License-bar exception for the low-RAM fallback slot only         | Accepted |
 | 0025 | Low-RAM fallback model: Gemma 3 1B replaces Qwen3-1.7B           | Accepted (supersedes fallback part of 0015; depends on 0024) |
 | 0026 | Per-article isolation for the "Artículos clave" citations       | Accepted (relates to 0007, 0008) |
+| 0027 | Spec-based local model selection: fit the largest model that runs | Accepted (follows 0015, depends on 0023) |
 
 ## Further reading
 
