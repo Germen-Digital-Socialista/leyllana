@@ -222,20 +222,21 @@ def test_explain_local_end_to_end_parsed(monkeypatch):
     assert exp.en_una_frase == "una ley sobre IA."
 
 
-def test_explain_uses_selection_for_publico_local_provider(monkeypatch):
-    # Ley corta (bajo el tope): select_key_articles devuelve todo sin rankear, asi
-    # que este test no necesita reranker ni BM25 real, solo confirmar que
-    # build_with_selection (no build) es lo que arma el prompt para PUBLICO+local.
+def test_explain_uses_isolation_for_publico_local_provider(monkeypatch):
+    # Ley corta (bajo el tope): select_key_articles devuelve todo sin rankear.
+    # PUBLICO+local arma "Articulos clave" articulo por articulo (aislamiento): una
+    # llamada de resumen (tres secciones) y una de gloss por articulo, en vez del
+    # build_with_selection conjunto que atribuia mal el numero (ROADMAP After-number).
     canned = (
         "Que hace: regula algo.\n"
         "A quien afecta: a los organismos.\n"
         "Articulos clave: Articulo 1.\n"
         "En una frase: una ley sobre IA."
     )
-    captured = {}
+    calls = []
 
     def fake_chat(base, messages, *, temperature, max_tokens, **kwargs):
-        captured["messages"] = messages
+        calls.append(messages)
         return canned
 
     monkeypatch.setattr("leyllana.engine.local.chat_completion", fake_chat)
@@ -245,9 +246,12 @@ def test_explain_uses_selection_for_publico_local_provider(monkeypatch):
     exp = explain(texto, Nivel.PUBLICO, _local_cfg())
 
     assert isinstance(exp, Explanation)
-    user_msg = captured["messages"][1]["content"]
-    assert "Articulos preseleccionados" in user_msg
-    assert "Articulo 1" in user_msg
+    systems = [m[0]["content"] for m in calls]
+    users = [m[1]["content"] for m in calls]
+    assert any("tres secciones" in s for s in systems)  # hubo llamada de resumen
+    assert any("Articulo a explicar" in u for u in users)  # hubo gloss por articulo
+    assert all("Articulos preseleccionados" not in u for u in users)  # no el viejo
+    assert "Articulo 1" in exp.articulos_clave  # numero estampado por el pipeline
 
 
 def test_explain_tecnico_still_uses_plain_build(monkeypatch):

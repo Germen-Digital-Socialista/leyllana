@@ -12,10 +12,10 @@ from __future__ import annotations
 import unicodedata
 
 from ..config import Config
-from ..prompt import build, build_extract, build_with_selection
+from ..prompt import build, build_extract, build_gloss, build_overview
 from ..types import Explanation, Nivel
 from .base import ConsentRequired, Provider
-from .chunking import chars_for_tokens, estimate_tokens, split_structural
+from .chunking import chars_for_tokens, estimate_tokens, short_label, split_structural
 from .local import LocalProvider
 from .progress import (
     Cancelled,
@@ -45,6 +45,13 @@ _SECTION_FIELDS = (
     ("a quien afecta", "a_quien_afecta"),
     ("articulos clave", "articulos_clave"),
     ("en una frase", "en_una_frase"),
+)
+
+# Las tres secciones narrativas (todas menos "Articulos clave"): las produce la
+# llamada de resumen del camino de aislamiento por articulo (ADR/ROADMAP
+# After-number). "Articulos clave" se arma aparte, articulo por articulo.
+_OVERVIEW_FIELDS = tuple(
+    (key, attr) for key, attr in _SECTION_FIELDS if key != "articulos clave"
 )
 
 
@@ -88,26 +95,63 @@ def explain(
     check(cancel)
     report(progress, Stage.GENERANDO)
     if nivel == Nivel.PUBLICO and isinstance(provider, LocalProvider):
-        reranker = _reranker_for(cfg)
-        try:
-            # Presupuesto de tokens para los articulos, no solo cantidad: unos
-            # pocos articulos largos pueden pesar mas que el presupuesto entero
-            # del prompt (medido en una ley real). Ver el docstring de
-            # select_key_articles.
-            articulo_budget = max(0, _budget_tokens(cfg, provider) - estimate_tokens(condensed))
-            articulos = select_key_articles(
-                text, nivel, reranker=reranker, max_tokens=articulo_budget
-            )
-            raw = provider.generate(
-                build_with_selection(condensed, articulos, nivel), cancel=cancel
-            )
-        finally:
-            if reranker is not None:
-                reranker.close()
-    else:
-        raw = provider.generate(build(condensed, nivel), cancel=cancel)
+        explanation = _explain_by_isolation(
+            text, condensed, provider, cfg, nivel, progress=progress, cancel=cancel
+        )
+        report(progress, Stage.VERIFICANDO)
+        return explanation
+    raw = provider.generate(build(condensed, nivel), cancel=cancel)
     report(progress, Stage.VERIFICANDO)
     return parse(raw)
+
+
+def _explain_by_isolation(
+    text: str,
+    condensed: str,
+    provider: Provider,
+    config: Config,
+    nivel: Nivel,
+    *,
+    progress: ProgressFn | None = None,
+    cancel: CancelToken | None = None,
+) -> Explanation:
+    """Camino PUBLICO local: arma "Articulos clave" articulo por articulo.
+
+    Las tres secciones narrativas salen de una llamada de resumen; "Articulos
+    clave" se arma explicando cada articulo preseleccionado en su propia llamada
+    (viendo solo su texto) y estampando el numero con ``short_label``. Asi el modelo
+    no ve dos articulos a la vez ni elige el numero, que es el modo por el que
+    atribuia el contenido de un articulo al numero de otro (ROADMAP After-number,
+    spec docs/superpowers/specs/2026-07-31-per-article-isolation-design.md).
+
+    El bucle por articulo es trabajo contable: alimenta el "fragmento i de N" de
+    FR-10 y es donde la cancelacion corta entre llamadas.
+    """
+    reranker = _reranker_for(config)
+    try:
+        # Presupuesto de tokens para los articulos, no solo cantidad: unos pocos
+        # articulos largos pueden pesar mas que el presupuesto entero del prompt
+        # (medido en una ley real). Ver el docstring de select_key_articles.
+        articulo_budget = max(
+            0, _budget_tokens(config, provider) - estimate_tokens(condensed)
+        )
+        articulos = select_key_articles(
+            text, nivel, reranker=reranker, max_tokens=articulo_budget
+        )
+        narrativa = parse_overview(
+            provider.generate(build_overview(condensed, nivel), cancel=cancel)
+        )
+        total = len(articulos)
+        bullets: list[str] = []
+        for i, art in enumerate(articulos, start=1):
+            check(cancel)
+            report(progress, Stage.GENERANDO, fragmento=i, total=total)
+            gloss = provider.generate(build_gloss(art, nivel), cancel=cancel).strip()
+            bullets.append(f"- **{short_label(art.label)}:** {gloss}")
+    finally:
+        if reranker is not None:
+            reranker.close()
+    return Explanation(articulos_clave="\n".join(bullets), **narrativa)
 
 
 def _reranker_for(config: Config) -> RerankerClient | None:
@@ -210,13 +254,17 @@ def _match_header(line: str, keys: list[str]) -> str | None:
     return None
 
 
-def parse(raw: str) -> Explanation:
-    """Parsea la respuesta cruda del modelo en las cuatro secciones (ADR 0007).
+# Todas las claves de seccion conocidas son limite de seccion al parsear, aunque
+# solo se pida un subconjunto: asi un "Articulos clave" que el modelo agregue de mas
+# corta la seccion anterior y su contenido se descarta, en vez de contaminarla.
+_ALL_SECTION_KEYS = [key for key, _ in _SECTION_FIELDS]
 
-    Busca los cuatro encabezados conocidos, tolerando acentos y vinetas. Si falta
-    alguna seccion, levanta ``ParseError`` en vez de rellenar con nada inventado.
-    """
-    keys = [key for key, _ in _SECTION_FIELDS]
+
+def _extract_sections(raw: str, want_keys: list[str]) -> dict[str, str]:
+    """Devuelve el texto de cada seccion en ``want_keys``, tolerando acentos y
+    vinetas. Cualquier encabezado conocido corta seccion; solo se exigen y se
+    devuelven las de ``want_keys``. Si falta alguna, levanta ``ParseError`` en vez
+    de rellenar con nada inventado."""
     found: dict[str, str] = {}
     current: str | None = None
     buffer: list[str] = []
@@ -226,7 +274,7 @@ def parse(raw: str) -> Explanation:
             found[current] = "\n".join(buffer).strip()
 
     for line in raw.splitlines():
-        header = _match_header(line, keys)
+        header = _match_header(line, _ALL_SECTION_KEYS)
         if header is not None:
             flush()
             current = header
@@ -238,18 +286,41 @@ def parse(raw: str) -> Explanation:
             buffer.append(line)
     flush()
 
-    faltan = [key for key in keys if key not in found]
+    faltan = [key for key in want_keys if key not in found]
     if faltan:
         raise ParseError(
             "La respuesta del modelo no trae las secciones: " + ", ".join(faltan)
         )
-    valores = {campo: found[key] for key, campo in _SECTION_FIELDS}
+    return {key: found[key] for key in want_keys}
+
+
+def parse(raw: str) -> Explanation:
+    """Parsea la respuesta cruda del modelo en las cuatro secciones (ADR 0007).
+
+    Busca los cuatro encabezados conocidos, tolerando acentos y vinetas. Si falta
+    alguna seccion, levanta ``ParseError`` en vez de rellenar con nada inventado.
+    """
+    sections = _extract_sections(raw, _ALL_SECTION_KEYS)
+    valores = {campo: sections[key] for key, campo in _SECTION_FIELDS}
     return Explanation(**valores)
+
+
+def parse_overview(raw: str) -> dict[str, str]:
+    """Parsea la respuesta del resumen en las tres secciones narrativas.
+
+    Devuelve ``{campo: texto}`` para ``que_hace``, ``a_quien_afecta`` y
+    ``en_una_frase`` (los campos de ``Explanation`` que no son "Articulos clave").
+    Un "Articulos clave" que el modelo agregue de mas se descarta. Misma disciplina
+    anti-invencion que ``parse``: si falta una de las tres, levanta ``ParseError``.
+    """
+    sections = _extract_sections(raw, [key for key, _ in _OVERVIEW_FIELDS])
+    return {campo: sections[key] for key, campo in _OVERVIEW_FIELDS}
 
 
 __all__ = [
     "explain",
     "parse",
+    "parse_overview",
     "ParseError",
     "ConsentRequired",
     "Cancelled",
