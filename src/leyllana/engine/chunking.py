@@ -20,9 +20,43 @@ _CHARS_PER_TOKEN = 3.5
 _DEFAULT_OVERLAP = 200
 
 # Marcadores de estructura al inicio de linea (tolerante a acentos y a "Art.").
+# Se usa para el corte por tamano del map-reduce (``split_structural``), donde un
+# limite de mas es inofensivo: solo mueve un borde entre trozos que igual se
+# reagrupan por tamano.
 _STRUCTURE_RE = re.compile(
     r"^[ \t]*(?:art[ií]culo|art\.|t[ií]tulo|cap[ií]tulo|p[áa]rrafo)\b",
     re.IGNORECASE | re.MULTILINE,
+)
+
+# Marcador de APERTURA de articulo, mas estricto que ``_STRUCTURE_RE`` y sensible
+# a mayusculas a proposito. Lo usa ``split_by_article``, cuyos trozos se rankean y
+# se citan como "articulos clave": un trozo espurio ahi se convierte en una cita
+# fabricada. BCN corta su texto a ~55 caracteres, de modo que una referencia
+# cruzada envuelta ("...del\narticulo 30 bis, ...") caia al inicio de una linea y
+# ``_STRUCTURE_RE`` la tomaba como un articulo nuevo (medido 2026-07-31: 6 trozos
+# espurios de 47 bastaron para hacer fallar las tres corridas de la Ley 21.719).
+# Dos senales distinguen una apertura real de una referencia envuelta:
+#   - Mayuscula inicial: BCN abre cada articulo con "Articulo" en mayuscula; una
+#     referencia envuelta conserva la minuscula de media oracion ("articulo 16.").
+#   - Forma "Articulo <n> .-/.": el numero u ordinal va seguido de la marca ".-"
+#     (o un punto), no de una continuacion ("Articulo 93 de la Constitucion...").
+_ORDINAL = (
+    r"(?:\d+|primero|segundo|tercero|cuarto|quinto|sexto|s[eé]ptimo|octavo|noveno|"
+    r"d[eé]cimo)"
+)
+_SUFIJO = r"(?:bis|ter|qu[áa]ter|quinquies|sexies|septies|octies|nonies|decies)"
+# La rama de articulo es sensible a mayusculas a proposito (la mayuscula es la
+# senal). La rama de encabezado estructural va con flag ``(?i:...)`` acotado: no
+# es fuente del defecto (las 7 referencias envueltas medidas eran "articulo") y
+# BCN escribe los titulos en versalitas ("TITULO II"), asi que respetarlos exige
+# ignorar la caja solo ahi. Sin esto se perderian encabezados reales.
+_ARTICLE_OPEN_RE = re.compile(
+    r"^[ \t]*(?:"
+    rf"(?:Art[ií]culo|Art\.)[ \t]+{_ORDINAL}[ \t]*[º°]?[ \t]*(?:{_SUFIJO})?[ \t]*[.\-]"
+    r"|"
+    r"(?i:t[ií]tulo|cap[ií]tulo|p[áa]rrafo)\b"
+    r")",
+    re.MULTILINE,
 )
 
 
@@ -44,9 +78,9 @@ def _split_by_size(text: str, max_chars: int, overlap: int) -> list[str]:
     return [text[i : i + max_chars] for i in range(0, len(text), step)]
 
 
-def _segments(text: str) -> list[str]:
-    """Parte ``text`` en segmentos que empiezan en cada marcador de estructura."""
-    starts = [m.start() for m in _STRUCTURE_RE.finditer(text)]
+def _segments(text: str, marker: re.Pattern[str] = _STRUCTURE_RE) -> list[str]:
+    """Parte ``text`` en segmentos que empiezan en cada ``marker`` de estructura."""
+    starts = [m.start() for m in marker.finditer(text)]
     if not starts:
         return [text]
     # El preambulo antes del primer marcador es su propio segmento.
@@ -60,11 +94,15 @@ def split_by_article(text: str) -> list[ArticleChunk]:
     El preambulo antes del primer marcador (titulo de la ley, encabezado) no es un
     articulo direccionable y se descarta: no tiene sentido rankearlo ni citarlo como
     "articulo clave". Si ``text`` no tiene ningun marcador, devuelve una lista vacia.
+
+    Corta con ``_ARTICLE_OPEN_RE``, mas estricto que el marcador del map-reduce: una
+    referencia cruzada envuelta por el ajuste de linea de BCN no abre segmento, asi
+    que su texto queda dentro del articulo que la contiene y no se rankea aparte.
     """
     chunks: list[ArticleChunk] = []
-    for seg in _segments(text):
+    for seg in _segments(text, _ARTICLE_OPEN_RE):
         stripped = seg.lstrip()
-        if not _STRUCTURE_RE.match(stripped):
+        if not _ARTICLE_OPEN_RE.match(stripped):
             continue
         label = stripped.splitlines()[0].strip()
         chunks.append(ArticleChunk(label=label, text=seg))

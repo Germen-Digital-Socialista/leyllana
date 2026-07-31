@@ -35,6 +35,70 @@ def test_split_by_article_no_markers_returns_empty():
     assert chunks == []
 
 
+def test_split_by_article_ignores_wrapped_crossreference():
+    # Defecto medido 2026-07-31: BCN corta el texto a ~55 caracteres, y una
+    # referencia cruzada que cae al inicio de una linea envuelta entraba como si
+    # abriera un articulo. Debe quedar dentro del articulo que la contiene, no
+    # convertirse en su propio trozo direccionable.
+    text = (
+        "     Articulo 4º.- Las funciones que establecen los\n"
+        "literales a) y b) del\n"
+        "articulo 30 bis, y las que establece el articulo 30 ter,\n"
+        "ambos del articulo primero, rigen desde la publicacion.\n"
+        "\n"
+        "     Articulo 5º.- Los organos publicos designaran a un\n"
+        "encargado dentro de los sesenta dias.\n"
+    )
+    chunks = split_by_article(text)
+    assert len(chunks) == 2
+    assert chunks[0].label.startswith("Articulo 4")
+    assert chunks[1].label.startswith("Articulo 5")
+    # El texto de la referencia cruzada no se pierde: sigue dentro del articulo 4.
+    assert "articulo 30 bis" in chunks[0].text
+
+
+def test_split_by_article_ignores_capital_crossreference():
+    # "Articulo 93 de la Constitucion..." arranca con mayuscula pero es una
+    # referencia cruzada: le sigue "de la", no la marca ".-" que abre un articulo.
+    text = (
+        "     Articulo 8º.- El mayor gasto fiscal se financia con\n"
+        "cargo al presupuesto vigente, segun lo dispuesto en el\n"
+        "Articulo 93 de la Constitucion Politica de la Republica.\n"
+    )
+    chunks = split_by_article(text)
+    assert len(chunks) == 1
+    assert chunks[0].label.startswith("Articulo 8")
+
+
+def test_split_by_article_ignores_lowercase_article_with_period():
+    # El caso de la Ley 19.628: "articulo 16." en minuscula, con punto, envuelto
+    # en medio de una oracion. La marca ".-" no basta; hace falta la mayuscula.
+    text = (
+        "     Articulo 15.- No obstante lo dispuesto en este\n"
+        "articulo 16.\n"
+        "El titular podra oponerse al tratamiento de sus datos.\n"
+    )
+    chunks = split_by_article(text)
+    assert len(chunks) == 1
+    assert chunks[0].label.startswith("Articulo 15")
+
+
+def test_split_by_article_keeps_transitory_ordinal_articles():
+    # Los articulos transitorios y finales de BCN no vienen indentados ni
+    # separados por linea en blanco del texto anterior; deben seguir contando
+    # como articulos (por eso el criterio no es "abre parrafo" sino la forma).
+    text = (
+        "Articulo primero.- Las modificaciones entran en vigencia\n"
+        "el primer dia del mes decimotercero.\n"
+        "Articulo segundo.- Los reglamentos se dictaran dentro de\n"
+        "un ano.\n"
+    )
+    chunks = split_by_article(text)
+    assert len(chunks) == 2
+    assert chunks[0].label.startswith("Articulo primero")
+    assert chunks[1].label.startswith("Articulo segundo")
+
+
 def test_estimate_tokens_scales_with_length():
     assert estimate_tokens("") == 0
     assert estimate_tokens("a" * 350) == 100  # ~3.5 chars/token
