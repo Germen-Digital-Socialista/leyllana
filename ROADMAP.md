@@ -13,6 +13,49 @@ a generic role.
 
 ---
 
+## Correccion: la validacion de mas abajo era de un solo documento, 2026-07-31
+
+**Lo que dice la seccion siguiente sigue siendo cierto y sigue siendo insuficiente.** Ese
+5/5 es una propiedad de la Ley 21.663, no del mecanismo. Se corrio despues el protocolo
+de `docs/superpowers/plans/2026-07-31-reranker-validation-protocol.md`: 9 corridas
+independientes, 3 documentos, criterio fijado por escrito antes de la primera corrida.
+
+**Resultado: 5 FIEL / 4 FABRICADO / 0 FALLO DE PARSEO.**
+
+| Documento | Corridas | Resultado |
+|---|---|---|
+| Ley 21.663 (control) | 3 | 3 fieles — reprodujo el conjunto verificado a mano |
+| Ley 19.628 | 3 | 2 fieles, 1 fabricado |
+| Ley 21.719 | 3 | 0 fieles |
+
+En la Ley 19.628 una corrida describio los articulos 17, 18 y 20 como normas
+sancionatorias; ninguno lo es. En la Ley 21.719, las tres corridas presentaron como
+"articulos clave" cadenas que en el texto son referencias cruzadas a **otra** ley y, en
+dos casos, al `articulo 19 N 4 de la Constitucion Politica`.
+
+**Causa, identificada y evidenciada:** `_STRUCTURE_RE` (`engine/chunking.py:23`) ancla a
+inicio de linea con `re.MULTILINE`, y el texto de BCN viene con saltos duros cada ~55
+caracteres. Una referencia cruzada que cae al principio de una linea envuelta entra como
+si abriera un articulo, y `chunking.py:69` toma esa linea completa como etiqueta del
+trozo. El defecto esta **aguas arriba del reranker**: BM25 y el cross-encoder solo pueden
+ordenar los trozos que reciben.
+
+`tools/audit_segmentation.py` lo mide sin modelo y sin red. Sobre los tres documentos, con
+verdad conocida a mano: Ley 21.663 0,0 % de ruido, Ley 19.628 3,6 %, Ley 21.719 12,8 %.
+Ese orden coincide con el resultado por documento de las 9 corridas sin habersele dicho.
+
+Bastaron **6 trozos espurios de 47** para que las tres corridas de la Ley 21.719 fallaran.
+El dano no es proporcional al ruido: un solo trozo espurio bien rankeado alcanza.
+
+**Lo que sigue abierto:** la correccion del regex no esta hecha. El indice enumerable de
+normas si existe (endpoint SPARQL de BCN, 16.064 leyes), pero falta el puente de numero de
+ley a `idNorma` para poder barrer una muestra representativa.
+
+Detalle completo, con cada fabricacion citada contra la fuente, en
+`mediciones/validacion-20260731-resultados.md` (local, `mediciones/` esta en gitignore).
+
+---
+
 ## First real validation: faithful, 2026-07-31
 
 Ran the actual mechanism end to end against **Qwen3-1.7B** on Ley 21.663 (the same document
