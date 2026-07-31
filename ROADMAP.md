@@ -153,6 +153,29 @@ the mechanism to be measured properly.
 
 ---
 
+## Open input-layer items carried forward, 2026-07-31
+**Status: In Progress**
+
+These were tracked in a session handoff that has since been deleted; recorded here so
+they are not lost. Neither is a segmentation or generation defect — both live in the
+input/corpus layer, upstream of everything the reranker and the explain pipeline do.
+
+1. **Two real norms the input layer cannot read.** `idNorma` 1138479 (Ley 21.180) and
+   1224631 (Ley 21.821) both fail in `_fetch_bcn_norma` with "BCN devolvio HTML en vez
+   del XML", reproducibly, while 1209272 and 141599 succeed. User-facing: someone pastes
+   a valid BCN link and gets an error. Cause unknown; roughly half of the ids tried on
+   2026-07-31 failed this way. Needs diagnosis of what distinguishes the failing ids
+   (version-specific URL? a norm type the XML endpoint does not serve?).
+
+2. **The idNorma bridge, blocking a population-level sample.** BCN's SPARQL endpoint
+   enumerates leyes by law number (16.064 of them, verified), but the fetcher needs an
+   `idNorma`, and `obtxml?opt=7&idLey=21719` returns HTML, not XML. Without a mapping from
+   law number to `idNorma` there is no way to draw a stratified random sample across the
+   corpus, so no faithfulness claim can move past the handful of hand-pinned documents.
+   This is the one thing blocking a corpus-scale answer.
+
+---
+
 ## Phase 0 — Foundation and decisions
 **Status: Done**
 
