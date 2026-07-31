@@ -33,6 +33,12 @@ gpu = "auto"
 # entrar contextos mas largos en el mismo presupuesto de memoria (ADR 0023).
 # kv_cache_type = "f16"
 
+# Que modelo local correr (ADR 0027). "auto" (default) elige el mas grande de los
+# de abajo cuya huella (archivo + cache KV al ctx) entra en el 60% de la memoria
+# viva: la VRAM del dispositivo si hay GPU, o la RAM total en CPU. "default" o
+# "fallback" fijan uno y ganan siempre.
+# model_selection = "auto"
+
 # Generacion conservadora, para no inventar (ADR 0008).
 temperature = 0.2
 max_tokens = 1024

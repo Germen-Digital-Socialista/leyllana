@@ -69,6 +69,7 @@ class EngineConfig:
     server_path: str | None = None
     gpu: str = "auto"
     kv_cache_type: str = "f16"
+    model_selection: str = "auto"
     temperature: float = 0.2
     max_tokens: int = 1024
     threads: int = 0
@@ -148,6 +149,7 @@ def load(path: str | Path | None = None) -> Config:
         server_path=engine_data.get("server_path"),
         gpu=engine_data.get("gpu", "auto"),
         kv_cache_type=engine_data.get("kv_cache_type", "f16"),
+        model_selection=engine_data.get("model_selection", "auto"),
         temperature=float(engine_data.get("temperature", 0.2)),
         max_tokens=int(engine_data.get("max_tokens", 1024)),
         threads=int(engine_data.get("threads", 0)),
@@ -191,6 +193,7 @@ def dumps(config: Config) -> str:
             ("server_path", e.server_path),
             ("gpu", e.gpu),
             ("kv_cache_type", e.kv_cache_type),
+            ("model_selection", e.model_selection),
             ("temperature", e.temperature),
             ("max_tokens", e.max_tokens),
             ("threads", e.threads),

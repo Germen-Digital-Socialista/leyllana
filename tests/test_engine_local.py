@@ -226,6 +226,54 @@ def test_generate_without_server_path_raises():
         LocalProvider(cfg).generate(Prompt(system="s", user="u"))
 
 
+def test_ensure_server_runs_the_selected_model(monkeypatch):
+    # ADR 0027: el modelo que arranca es el que elige select_model (aqui, el
+    # fallback por memoria justa), no siempre el default.
+    from leyllana.engine import model_fit
+    from leyllana.engine.server import OffloadPlan
+
+    cfg = Config(
+        engine=EngineConfig(
+            server_path="srv",
+            default_model=ModelConfig(path="big.gguf", ctx=4096),
+            fallback_model=ModelConfig(path="small.gguf", ctx=2048),
+        )
+    )
+    prov = LocalProvider(cfg)
+
+    monkeypatch.setattr(
+        "leyllana.engine.local.plan_offload",
+        lambda gpu, binary: OffloadPlan(0, None, "CPU"),
+    )
+    elegido = model_fit.ModelChoice(
+        cfg.engine.fallback_model, "fallback", "memoria justa", True
+    )
+    monkeypatch.setattr(
+        "leyllana.engine.local.select_model", lambda engine, live: elegido
+    )
+
+    captured = {}
+
+    def fake_server(binary, model_path, *, ctx, gpu, threads, kv_cache_type):
+        captured.update(model_path=model_path, ctx=ctx)
+
+        class _S:
+            def ensure(self):
+                return "http://fake"
+
+            def stop(self):
+                pass
+
+        return _S()
+
+    monkeypatch.setattr("leyllana.engine.local.LlamaServer", fake_server)
+
+    prov._ensure_server()
+    assert captured["model_path"] == "small.gguf"
+    assert captured["ctx"] == 2048
+    assert prov.model_report == "memoria justa"
+
+
 def test_generate_without_model_path_raises():
     cfg = Config(engine=EngineConfig(server_path="srv"))
     with pytest.raises(ProviderError):

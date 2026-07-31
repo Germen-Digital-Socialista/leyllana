@@ -44,6 +44,21 @@ def test_load_reads_kv_cache_type(tmp_path):
     assert load(toml).engine.kv_cache_type == "q8_0"
 
 
+def test_model_selection_default_is_auto():
+    assert Config().engine.model_selection == "auto"
+
+
+def test_load_reads_model_selection(tmp_path):
+    toml = tmp_path / "leyllana.toml"
+    toml.write_text(
+        "[engine]\n"
+        'provider = "local"\n'
+        'model_selection = "fallback"\n',
+        encoding="utf-8",
+    )
+    assert load(toml).engine.model_selection == "fallback"
+
+
 def test_reranker_model_defaults():
     cfg = Config()
     assert cfg.engine.reranker_model.path is None

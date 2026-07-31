@@ -1,8 +1,9 @@
 """Proveedor local: modelo llama.cpp via ``llama-server`` (ADR 0003, 0016).
 
 Mapea el ``Prompt`` (system + user) a un chat OpenAI-compatible contra un
-``llama-server`` gestionado. Modelo por defecto y ejecucion vienen de la config
-(ADR 0015); la seleccion automatica por RAM del fallback queda para mas adelante.
+``llama-server`` gestionado. La ejecucion viene de la config (ADR 0015); cual de
+los modelos configurados se arranca lo decide ``select_model`` segun la memoria de
+la maquina (ADR 0027), a menos que la config fije uno.
 """
 
 from __future__ import annotations
@@ -12,8 +13,9 @@ import atexit
 from ..config import Config
 from ..prompt import Prompt
 from .base import ProviderError
+from .model_fit import live_memory_bytes, select_model
 from .progress import CancelToken
-from .server import LlamaServer, chat_completion
+from .server import LlamaServer, chat_completion, plan_offload
 
 
 class LocalProvider:
@@ -22,24 +24,37 @@ class LocalProvider:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._server: LlamaServer | None = None
+        # Que modelo se eligio y por que (ADR 0027). Se llena en ``_ensure_server``.
+        self.model_report: str = ""
 
     def _ensure_server(self) -> str:
-        """Crea (una vez) y arranca el ``llama-server`` del modelo por defecto."""
+        """Crea (una vez) y arranca el ``llama-server`` del modelo elegido.
+
+        Elige entre los modelos configurados el mas grande que entra en una
+        fraccion segura de la memoria viva (ADR 0027): VRAM del dispositivo si la
+        GPU esta activa (ADR 0023), o RAM total en CPU. Una eleccion fijada en la
+        config gana.
+        """
         if self._server is None:
             engine = self._config.engine
-            model = engine.default_model
             if not engine.server_path:
                 raise ProviderError(
                     "Configure engine.server_path (binario llama-server, ADR 0016)."
                 )
-            if not model.path:
+            plan = plan_offload(engine.gpu, engine.server_path)
+            live = live_memory_bytes(
+                plan.device.total_mib if plan.device is not None else None
+            )
+            choice = select_model(engine, live)
+            self.model_report = choice.report
+            if not choice.model.path:
                 raise ProviderError(
                     "Configure la ruta del modelo (engine.models.default.path)."
                 )
             self._server = LlamaServer(
                 engine.server_path,
-                model.path,
-                ctx=model.ctx,
+                choice.model.path,
+                ctx=choice.model.ctx,
                 gpu=engine.gpu,
                 threads=engine.threads,
                 kv_cache_type=engine.kv_cache_type,
