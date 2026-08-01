@@ -49,5 +49,8 @@ Thumbs.db
 # Salidas de la instrumentacion de desarrollo (tools/), nunca versionadas.
 mediciones/
 
-# Third-party Claude Code skills installed locally (project-scoped, not source).
-.claude/skills/
+# Local agent tooling, not leyllana source: Claude Code config, skills installed
+# via the skills.sh CLI, and its lockfile. Project-scoped to this machine.
+.claude/
+.agents/
+skills-lock.json
